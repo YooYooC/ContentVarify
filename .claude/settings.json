@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(node --check supabase-sync.js)",
+      "Bash(python3 -m http.server 8000)",
+      "Bash(node --check config.js)"
+    ]
+  }
+}

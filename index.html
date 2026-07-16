@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Content Verify</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Access gate — covers everything until the viewer is approved. -->
+  <div id="gate" class="gate"></div>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><span class="brand-title">Content Verify</span></div>
+      <nav class="navbar" id="navbar"></nav>
+      <div class="quality-badge" id="qualityBadge"></div>
+      <div class="authbar" id="authbar"></div>
+    </div>
+    <div class="topbar-inner searchrow">
+      <input class="search-input" id="search" type="search"
+             placeholder="Search biases and examples…" autocomplete="off">
+      <span class="search-meta" id="searchMeta"></span>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="legend">
+      <div class="legend-head">
+        <h2>Bias colour scale</h2>
+        <p>White = clear thinking (0% biased) · dark pink = bias in full force (100%).</p>
+      </div>
+      <div>
+        <div class="legend-gradient">
+          <span class="legend-tick" style="left:0%"><i></i><b>0</b></span>
+          <span class="legend-tick" style="left:25%"><i></i><b>25</b></span>
+          <span class="legend-tick" style="left:50%"><i></i><b>50</b></span>
+          <span class="legend-tick" style="left:75%"><i></i><b>75</b></span>
+          <span class="legend-tick" style="left:100%"><i></i><b>100</b></span>
+        </div>
+        <div class="legend-labels"><span>Not biased</span><span>Most biased</span></div>
+      </div>
+    </section>
+
+    <div class="cat-head">
+      <h1 id="cat-title"></h1>
+      <p class="cat-meta" id="cat-meta"></p>
+    </div>
+
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <!-- 1. Supabase connection settings (yours to fill in) -->
+  <script src="config.js"></script>
+  <!-- 2. Supabase client library (skipped gracefully if offline) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- 3. The bias dataset → window.BIAS_DATA -->
+  <script src="data/biases.js"></script>
+  <!-- 4. The app (defines window.CVApp, renders the UI) -->
+  <script src="app.js"></script>
+  <!-- 5. Cloud sync (uses CVApp + Supabase; no-op until configured) -->
+  <script src="supabase-sync.js"></script>
+</body>
+</html>
