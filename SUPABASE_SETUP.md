@@ -1,62 +1,26 @@
-# Content Verify — Supabase setup (email + password)
+# Content Verify — Supabase setup (shared sync, no login)
 
-A private collaborative tool. Everyone signs in with **email + password**;
-**only the admin** (`yoyotsai2024@gmail.com`) can create, deactivate, delete, or
-reset users, from an in-app **Manage members** panel. Public sign-up is off. All
-active members edit **one shared dataset** with live realtime sync.
-
-The Supabase **service-role key never appears in the frontend** — user creation
-and deletion run inside the `admin-users` Edge Function, where Supabase injects
-that key at runtime.
+Every device that opens the app shares **one dataset** with live realtime
+sync. There are **no accounts, no admin, no membership** — anyone with the
+app URL can read and edit the shared data.
 
 ---
 
-## A. One-time dashboard setup
+## A. One-time setup
 
-### 1. Disable public sign-up
-**Authentication → Providers → Email**:
-- **Enable Email provider**: ON
-- **Confirm email**: OFF  (the admin creates users pre-confirmed)
-- **Allow new users to sign up**: **OFF**  ← important; only the admin makes users
-- Save.
-
-### 2. Create your admin account
-**Authentication → Users → Add user**:
-- Email: `yoyotsai2024@gmail.com`
-- Password: (choose one)
-- **Auto Confirm User**: ON
-- Create. This is the only account with admin powers (matched by email in RLS
-  and in the Edge Function).
-
-### 3. Run the SQL
+### 1. Run the SQL
 **SQL Editor → New query** → paste all of
-[`supabase/schema.sql`](supabase/schema.sql) → **Run**. It creates `members`,
-the `is_admin()` / `is_approved()` policies, keeps `shared_state` + realtime, and
-removes the old magic-link tables. Safe to re-run; your shared data is preserved.
+[`supabase/schema.sql`](supabase/schema.sql) → **Run**.
 
-### 4. Deploy the Edge Function
-The function is at [`supabase/functions/admin-users/index.ts`](supabase/functions/admin-users/index.ts).
+It creates the `shared_state` table, opens read/write access, enables
+realtime, and removes the old auth/admin/membership machinery. Safe to
+re-run; your shared data is preserved.
 
-**Option A — Supabase CLI (recommended):**
-```bash
-# one-time
-brew install supabase/tap/supabase        # or: npm i -g supabase
-supabase login
-supabase link --project-ref oqzmikjtphhhmcmajzvw
+### 2. config.js
+Already set: your `url` and `anonKey`. Nothing secret here — the anon key
+is meant to ship in the browser.
 
-# deploy
-supabase functions deploy admin-users
-```
-
-**Option B — Dashboard:** **Edge Functions → Create a function** → name it
-exactly `admin-users` → paste the contents of `index.ts` → Deploy.
-
-No secrets to configure: Supabase automatically provides `SUPABASE_URL`,
-`SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to the function. **Never**
-put the service-role key in `config.js` or the repo.
-
-### 5. config.js
-Already set: your `url`, `anonKey`, and `adminEmail`. Nothing secret here.
+That's it. No Edge Function, no user creation, no dashboard auth settings.
 
 ---
 
@@ -64,61 +28,38 @@ Already set: your `url`, `anonKey`, and `adminEmail`. Nothing secret here.
 ```bash
 python3 -m http.server 8000   # → http://localhost:8000
 ```
-For real use, host the folder on Netlify / Vercel / Cloudflare Pages / GitHub
-Pages (static, free). Password auth works on any origin — no Site-URL/redirect or
-email delivery needed anymore.
+For real use, host the folder on Netlify / Vercel / Cloudflare Pages /
+GitHub Pages (static, free).
 
 ---
 
-## C. Test it end-to-end
-
-### Log in as admin
-1. Open the app → white/pink **Sign in** screen.
-2. Enter `yoyotsai2024@gmail.com` + the password from step A.2 → **Sign in**.
-3. You land in the app with an **Admin** button in the top-right.
-
-### Add a collaborator
-4. Click **Admin** → under **Add member**, type their email + a temporary
-   password → **Add**. They appear in the Members list marked **active**.
-
-### Log in as that collaborator
-5. Open the app in a private/incognito window → sign in with that email +
-   temporary password → they see the shared dataset.
-6. Edit something in one window → it updates live in the other.
-
-### Reset / deactivate / delete
-7. Back in the admin window → **Admin**:
-   - **Reset password** → enter a new temporary password for them.
-   - **Deactivate** → their window drops to "No access" live, and they can no
-     longer read/write the data. **Reactivate** restores it.
-   - **Delete** → removes their login permanently (their `members` row is
-     cascaded away).
+## C. Test cross-device sync
+1. Open the app on device A → top-right shows **synced**.
+2. Open the app on device B (or a second browser).
+3. Edit something on A → it appears on B within a second (and vice-versa),
+   with a brief **updated on another device** note.
 
 ---
 
 ## How it fits together
 | Piece | Role |
 |---|---|
-| `index.html` | `#gate` overlay + app DOM |
-| `config.js` | URL, anon key, adminEmail (no secrets) |
-| `supabase-sync.js` | password sign-in, access gate, admin panel, shared sync |
+| `index.html` | app DOM |
+| `config.js` | Supabase URL + anon key (no secrets) |
+| `supabase-sync.js` | pull / push / realtime for the shared dataset |
 | `app.js` | unchanged; exposes `window.CVApp` |
-| `supabase/schema.sql` | `members`, RLS, `shared_state`, realtime |
-| `supabase/functions/admin-users/index.ts` | admin-only user create/delete/deactivate/reset |
+| `supabase/schema.sql` | `shared_state` table, open RLS, realtime |
 
-## Security notes
-- **Admin is enforced twice**: RLS (`is_admin()` on the DB) *and* an email check
-  inside the Edge Function. A non-admin calling the function gets `403`.
-- **Deactivate is immediate**: RLS (`is_approved`) blocks data access on the next
-  request, and the login is banned.
-- **Service-role key** never leaves Supabase's servers.
-- **Shared data is shared**: any active member can edit or reset it; last save
-  wins on simultaneous edits (realtime keeps copies fresh between edits).
+## Notes
+- **The data is public to anyone with the app.** There is no login by
+  design. If you later want it private, put the app behind a host-level
+  password (e.g. Netlify/Cloudflare Access) or add Supabase auth back.
+- **Last save wins** on simultaneous edits; realtime keeps every open
+  device fresh between edits.
 
 ## If something errors
-Open the browser console (Cmd+Option+J) and watch for `[members]`, `[sync]`, or
-admin-panel messages. Common ones:
-- *“Forbidden — admin only.”* → you're not signed in as `yoyotsai2024@gmail.com`.
-- *Function 404 / not found* → the `admin-users` function isn't deployed (step A.4).
-- *Sign-in “Invalid login credentials”* → wrong password, or the user was never
-  created / was deleted.
+Open the browser console (Cmd+Option+J) and watch for `[sync]` messages.
+- *"permission denied for table shared_state"* → the SQL in step A.1 wasn't
+  run (or didn't grant `anon`). Re-run it.
+- *"can't reach the shared copy — retrying…"* → network/URL issue; check
+  `config.js` `url` and that the project is up.

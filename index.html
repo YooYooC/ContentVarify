@@ -7,9 +7,6 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- Access gate — covers everything until the viewer is approved. -->
-  <div id="gate" class="gate"></div>
-
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand"><span class="brand-title">Content Verify</span></div>
@@ -58,7 +55,7 @@
   <script src="data/biases.js"></script>
   <!-- 4. The app (defines window.CVApp, renders the UI) -->
   <script src="app.js"></script>
-  <!-- 5. Cloud sync (uses CVApp + Supabase; no-op until configured) -->
+  <!-- 5. Shared cross-device sync (uses CVApp + Supabase; no-op until configured) -->
   <script src="supabase-sync.js"></script>
 </body>
 </html>
