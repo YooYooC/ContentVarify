@@ -11,6 +11,19 @@
     <div class="topbar-inner">
       <div class="brand"><span class="brand-title">Content Verify</span></div>
       <nav class="navbar" id="navbar"></nav>
+      <div class="export-wrap">
+        <button class="export-btn" id="exportBtn" type="button" aria-haspopup="true" aria-expanded="false">
+          <span class="export-ic" aria-hidden="true">⤓</span> Export
+        </button>
+        <div class="export-menu hidden" id="exportMenu" role="menu">
+          <button class="export-item" data-x="sheets" type="button" role="menuitem">
+            <b>Export to Google Sheets</b><small>Copy the table &amp; open a new sheet to paste</small></button>
+          <button class="export-item" data-x="csv" type="button" role="menuitem">
+            <b>Download spreadsheet</b><small>.csv — Sheets, Excel, Numbers</small></button>
+          <button class="export-item" data-x="doc" type="button" role="menuitem">
+            <b>Download document</b><small>.doc — Word, Google Docs</small></button>
+        </div>
+      </div>
       <div class="quality-badge" id="qualityBadge"></div>
       <div class="authbar" id="authbar"></div>
     </div>
@@ -55,7 +68,9 @@
   <script src="data/biases.js"></script>
   <!-- 4. The app (defines window.CVApp, renders the UI) -->
   <script src="app.js"></script>
-  <!-- 5. Shared cross-device sync (uses CVApp + Supabase; no-op until configured) -->
+  <!-- 5. Export menu (CSV / Word / Google Sheets; uses CVApp.exportData) -->
+  <script src="export.js"></script>
+  <!-- 6. Shared cross-device sync (uses CVApp + Supabase; no-op until configured) -->
   <script src="supabase-sync.js"></script>
 </body>
 </html>

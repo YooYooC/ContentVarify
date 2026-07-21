@@ -74,7 +74,35 @@
       updateQualityBadge();
     },
     // Set by the sync layer; called after every local save() with the payload.
-    _onSave: null
+    _onSave: null,
+
+    // Flattened, fully-computed snapshot for exporting (spreadsheet / doc).
+    // Honours every override, score, and exclusion currently in effect.
+    exportData: function () {
+      var rows = [];
+      QUADRANTS.forEach(function (q) {
+        (q.categories || []).forEach(function (c) {
+          (c.biases || []).forEach(function (b) {
+            var a = avgBias(b);
+            var bscore = a == null ? "" : Math.round(a);
+            var add = function (list, type) {
+              (list || []).forEach(function (it) {
+                rows.push({
+                  quadrant: q.name, category: c.name, bias: b.name,
+                  biasScore: bscore, type: type,
+                  text: effText(it), score: effScore(it),
+                  url: it.url || "", excluded: isExcluded(it) ? "yes" : ""
+                });
+              });
+            };
+            add(b.positive, "Example");
+            add(b.negative, "Counter-example");
+          });
+        });
+      });
+      var oq = overallQuality();
+      return { rows: rows, overall: oq == null ? null : Math.round(oq * 10) / 10 };
+    }
   };
 
   var view = { q: 0, c: 0 }; // current quadrant / category being shown
