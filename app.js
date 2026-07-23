@@ -26,13 +26,14 @@
   var state = loadState();
 
   function loadState() {
-    var base = { items: {}, quality: [] };
+    var base = { items: {}, quality: [], added: {} };
     try {
       var raw = localStorage.getItem(STORE_KEY);
       if (raw) {
         var p = JSON.parse(raw);
         base.items = p.items || {};
         base.quality = p.quality || [];
+        base.added = p.added || {};
       }
     } catch (e) {}
     return base;
@@ -40,7 +41,8 @@
   function persistLocal() {
     try {
       localStorage.setItem(STORE_KEY,
-        JSON.stringify({ items: state.items, quality: state.quality }));
+        JSON.stringify({ items: state.items, quality: state.quality,
+                        added: state.added }));
     } catch (e) {}
   }
   function save() {
@@ -60,7 +62,7 @@
   window.CVApp = {
     // Current persisted payload (exactly what save() writes).
     getState: function () {
-      return { items: state.items, quality: state.quality };
+      return { items: state.items, quality: state.quality, added: state.added };
     },
     // Adopt a copy pulled from the cloud, cache it locally, then repaint.
     // Uses persistLocal() (not save()) so adopting a remote copy never
@@ -69,6 +71,8 @@
       if (!incoming || typeof incoming !== "object") return;
       state.items = incoming.items || {};
       state.quality = incoming.quality || [];
+      state.added = incoming.added || {};
+      injectAdded();   // re-materialise user-added examples from the new state
       persistLocal();
       render();
       updateQualityBadge();
@@ -131,6 +135,46 @@
       });
     });
   });
+
+  /* ============================================================
+     User-added examples. These live in state.added (keyed by biasId,
+     with positive/negative arrays of {text, score, url}) so they
+     survive reloads and ride along with cloud sync. injectAdded()
+     materialises them back into the live bias arrays + ITEMS index,
+     giving each a stable id (":pa<n>" / ":na<n>") so marks, edits and
+     history work exactly like the built-in examples. It's idempotent —
+     safe to re-run whenever state.added changes (e.g. after a sync).
+     ============================================================ */
+  function injectAdded() {
+    // Drop anything previously injected so a re-run never duplicates.
+    Object.keys(ITEMS).forEach(function (id) {
+      if (id.indexOf(":pa") >= 0 || id.indexOf(":na") >= 0) delete ITEMS[id];
+    });
+    function fill(recs, arr, biasId, tag) {
+      (recs || []).forEach(function (rec, idx) {
+        var it = { text: rec.text, score: rec.score, url: rec.url || "",
+                   __added: true };
+        var id = biasId + ":" + tag + idx;
+        it.__id = id;
+        arr.push(it);
+        ITEMS[id] = { item: it, biasId: biasId };
+      });
+    }
+    QUADRANTS.forEach(function (q, qi) {
+      q.categories.forEach(function (c, ci) {
+        c.biases.forEach(function (b, bi) {
+          var biasId = qi + "." + ci + "." + bi;
+          b.positive = (b.positive || []).filter(function (it) { return !it.__added; });
+          b.negative = (b.negative || []).filter(function (it) { return !it.__added; });
+          var store = state.added[biasId];
+          if (!store) return;
+          fill(store.positive, b.positive, biasId, "pa");
+          fill(store.negative, b.negative, biasId, "na");
+        });
+      });
+    });
+  }
+  injectAdded();
 
   /* ============================================================
      Bias color scale (matches the legend gradient)
@@ -316,6 +360,35 @@
     o.score = newScore;
     afterMutation(item.__id);
     return true;
+  }
+
+  /* Add a brand-new example to a bias. `type` is "positive" (example of
+     the bias) or "negative" (counter-example). The score is produced by
+     the project's scoring model — computeBiasScore() — from the text,
+     never typed by the user, so a new example is judged by the very same
+     criteria as every built-in one. Returns the live item so the caller
+     can render it. */
+  function addExample(bias, type, text) {
+    var biasId = bias.__id;
+    var score = computeBiasScore(text);
+    if (!state.added[biasId]) state.added[biasId] = { positive: [], negative: [] };
+    var store = state.added[biasId];
+    if (!store[type]) store[type] = [];
+    var idx = store[type].length;
+    store[type].push({ text: text, score: score, url: "" });
+
+    var it = { text: text, score: score, url: "", __added: true };
+    var id = biasId + ":" + (type === "positive" ? "pa" : "na") + idx;
+    it.__id = id;
+    bias[type].push(it);
+    ITEMS[id] = { item: it, biasId: biasId };
+
+    save();
+    recordQuality();
+    refreshBias(biasId);
+    updateQualityBadge();
+    if (view.q === OVERVIEW_Q && !searching()) renderOverview();
+    return it;
   }
 
   /* ============================================================
@@ -547,6 +620,81 @@
     return ul;
   }
 
+  /* "Add example" affordance shown under each list. Clicking reveals an
+     inline editor with a live score preview (from the same scoring model);
+     saving appends the new example to the list and re-scores the bias. */
+  function buildAdder(bias, type, ul) {
+    var wrap = document.createElement("div");
+    wrap.className = "add-ex";
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "add-ex-btn";
+    btn.textContent = type === "positive"
+      ? "+ Add example" : "+ Add counter-example";
+    wrap.appendChild(btn);
+
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (wrap.querySelector(".add-ex-form")) return; // already open
+
+      btn.style.display = "none";
+      var form = document.createElement("div");
+      form.className = "ex-edit add-ex-form";
+
+      var ta = document.createElement("textarea");
+      ta.className = "ex-edit-text";
+      ta.rows = 3;
+      ta.placeholder = type === "positive"
+        ? "New example of the bias…"
+        : "New counter-example (clear thinking)…";
+
+      var row = document.createElement("div");
+      row.className = "ex-edit-row";
+
+      var auto = document.createElement("span");
+      auto.className = "ex-edit-auto";
+      function refreshAuto() {
+        var t = ta.value.trim();
+        auto.innerHTML = 'Algorithm score: <b>' +
+          (t ? computeBiasScore(t) : "—") + (t ? '%' : '') + '</b>';
+        auto.title = "Scored automatically by the model from your text";
+      }
+      refreshAuto();
+      ta.addEventListener("input", refreshAuto);
+
+      var addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "btn save";
+      addBtn.textContent = "Add";
+      var cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.className = "btn cancel";
+      cancelBtn.textContent = "Cancel";
+
+      row.appendChild(auto);
+      row.appendChild(addBtn);
+      row.appendChild(cancelBtn);
+      form.appendChild(ta);
+      form.appendChild(row);
+      wrap.appendChild(form);
+      ta.focus();
+
+      function close() { form.remove(); btn.style.display = ""; }
+      cancelBtn.addEventListener("click", function (e) { e.stopPropagation(); close(); });
+      addBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var t = ta.value.trim();
+        if (!t) { close(); return; }
+        var it = addExample(bias, type, t);
+        ul.appendChild(makeItem(it));
+        close();
+      });
+    });
+
+    return wrap;
+  }
+
   /* ============================================================
      Bias card — title coloured by its Average one single bias.
      ============================================================ */
@@ -615,12 +763,16 @@
     var pos = document.createElement("div");
     pos.className = "list-col pos";
     pos.innerHTML = '<h3><span class="dot"></span>Examples of the bias</h3>';
-    pos.appendChild(buildList(bias.positive));
+    var posUl = buildList(bias.positive);
+    pos.appendChild(posUl);
+    pos.appendChild(buildAdder(bias, "positive", posUl));
 
     var neg = document.createElement("div");
     neg.className = "list-col neg";
     neg.innerHTML = '<h3><span class="dot"></span>Counter-examples (clear thinking)</h3>';
-    neg.appendChild(buildList(bias.negative));
+    var negUl = buildList(bias.negative);
+    neg.appendChild(negUl);
+    neg.appendChild(buildAdder(bias, "negative", negUl));
 
     lists.appendChild(pos);
     lists.appendChild(neg);
