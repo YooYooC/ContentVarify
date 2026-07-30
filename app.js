@@ -17,7 +17,8 @@
   var legend = document.querySelector(".legend");
 
   var QUADRANTS = DATA.quadrants || [];
-  var OVERVIEW_Q = QUADRANTS.length; // synthetic "Full Picture" tab index
+  var OVERVIEW_Q = QUADRANTS.length;     // synthetic "Full Picture" tab
+  var TEST_Q     = QUADRANTS.length + 1; // synthetic "Test text" tab
 
   /* ============================================================
      Persistence (no backend — everything lives in localStorage)
@@ -299,6 +300,53 @@
   var trainState = "idle";  // "idle" | "training" | "ready" | "unavailable"
   var trainTimer = null;
 
+  /* ------------------------------------------------------------
+     Retrieval — the system that answers "which bias is this?".
+
+     It is rebuilt from the same curated set as the baseline model, so
+     ✕ / edits / additions move both. The two are kept side by side on
+     purpose: the binary model is the frozen baseline (bias vs clear
+     thinking), retrieval is what the product actually asks for.
+     ------------------------------------------------------------ */
+  var RETRIEVAL = null;
+
+  // Group entries that are the same bias in different places in the file
+  // (the corpus contains a duplicated quadrant) so they don't double-vote.
+  function biasKeyOf(bias) { return bias.name.trim().toLowerCase(); }
+
+  var BIAS_BY_KEY = {};
+  QUADRANTS.forEach(function (q) {
+    q.categories.forEach(function (c) {
+      c.biases.forEach(function (b) {
+        var k = biasKeyOf(b);
+        if (!BIAS_BY_KEY[k]) BIAS_BY_KEY[k] = b;
+      });
+    });
+  });
+
+  function retrievalDocs() {
+    var out = [];
+    Object.keys(ITEMS).forEach(function (id) {
+      var it = ITEMS[id].item;
+      if (isExcluded(it)) return;              // curation decides the index
+      var b = BIASES_BY_ID[ITEMS[id].biasId];
+      if (!b) return;
+      out.push({ id: id, text: effText(it), label: it.__label,
+                 biasKey: biasKeyOf(b), biasName: b.name,
+                 quad: b.__loc.quad, cat: b.__loc.cat });
+    });
+    return out;
+  }
+
+  var BIASES_BY_ID = {};
+  QUADRANTS.forEach(function (q, qi) {
+    q.categories.forEach(function (c, ci) {
+      c.biases.forEach(function (b, bi) { BIASES_BY_ID[qi + "." + ci + "." + bi] = b; });
+    });
+  });
+
+  function retrievalReady() { return !!(RETRIEVAL && RETRIEVAL.ready); }
+
   /* The training set: every example the user hasn't taken out, at its
      current wording. */
   function trainingDocs() {
@@ -313,6 +361,9 @@
 
   function trainNow() {
     trainTimer = null;
+    if (window.CVRetrieval && window.CVEncoder) {
+      RETRIEVAL = window.CVRetrieval.build(retrievalDocs(), window.CVEncoder.tfidf());
+    }
     if (!window.CVModel) { trainState = "unavailable"; repaintScores(); return; }
     MODEL = window.CVModel.train(trainingDocs());
     trainState = MODEL.ready ? "ready" : "unavailable";
@@ -536,6 +587,14 @@
   /* After a refit every score on screen is stale — repaint them in place
      rather than re-rendering, so open cards and scroll position survive. */
   function repaintScores() {
+    if (view.q === TEST_Q && !searching()) {
+      // The index changed underneath the result on screen — re-run so what
+      // is shown always reflects the dataset as it stands now.
+      if (testState.text.trim()) runTestPreserving();
+      renderTest();
+      updateQualityBadge();
+      return;
+    }
     if (view.q === OVERVIEW_Q && !searching()) { renderOverview(); updateQualityBadge(); return; }
     Object.keys(itemNodes).forEach(rebuildItem);
     Object.keys(chipRefresh).forEach(refreshBias);
@@ -1053,6 +1112,116 @@
     return t;
   }
 
+  /* The bias-recognition system: what it can do, and where it can't.
+     This panel is the curation to-do list — every weak row is a bias
+     that needs better examples. */
+  function buildRetrievalPanel() {
+    var wrap = document.createElement("div");
+    wrap.className = "mx-panel";
+
+    var h = document.createElement("h2");
+    h.className = "mx-title";
+    h.textContent = "Bias recognition";
+    wrap.appendChild(h);
+
+    if (!retrievalReady()) {
+      var p = document.createElement("p");
+      p.className = "ov-note";
+      p.textContent = trainState === "training"
+        ? "Rebuilding the retrieval index…"
+        : "Retrieval is unavailable — retrieval.js or encoder.js did not load.";
+      wrap.appendChild(p);
+      return wrap;
+    }
+
+    var s = RETRIEVAL.stats, L = s.loo;
+    var tiles = document.createElement("div");
+    tiles.className = "mx-tiles";
+    tiles.appendChild(metricTile("Answers given", (L.presented * 100).toFixed(1) + "%",
+      "Share of held-out examples where the evidence was strong enough to " +
+      "present a candidate at all. The rest return “unable to classify reliably”."));
+    tiles.appendChild(metricTile("Right when it answers",
+      (L.top1WhenPresented * 100).toFixed(1) + "%",
+      "Top-1 accuracy on the queries it chose to answer. This is the number " +
+      "that matters: what a shown answer is worth."));
+    tiles.appendChild(metricTile("Top-1 overall", (L.top1 * 100).toFixed(1) + "%",
+      "Including every abstention as a miss. Leave-one-out over " + L.n +
+      " examples, with duplicate texts hidden together."));
+    tiles.appendChild(metricTile("Top-5 overall", (L.top5 * 100).toFixed(1) + "%",
+      "How often the correct bias is somewhere in the top five candidates."));
+    tiles.appendChild(metricTile("Biases", String(s.biases),
+      s.positives + " examples · " + (s.docs - s.positives) + " counter-examples"));
+    tiles.appendChild(metricTile("Encoder", "TF-IDF",
+      s.encoderLabel + " · " + s.features.toLocaleString() +
+      " features. Swappable for sentence embeddings without touching the rest."));
+    wrap.appendChild(tiles);
+
+    var note = document.createElement("p");
+    note.className = "ov-note";
+    note.textContent =
+      "Your text is compared against every curated example; the nearest ones vote " +
+      "for their bias and counter-examples vote against. Nothing is invented — a " +
+      "bias with no examples can never be predicted. Every number here is " +
+      "leave-one-out: each example is matched against an index that excludes it " +
+      "and its duplicates.";
+    wrap.appendChild(note);
+
+    /* the weak spots — ranked worst first, which is the work queue */
+    var rows = [];
+    Object.keys(RETRIEVAL.perBias).forEach(function (k) {
+      var p = RETRIEVAL.perBias[k];
+      if (p.tried) rows.push(p);
+    });
+    rows.sort(function (a, b) {
+      return (a.accuracy - b.accuracy) || (a.pos - b.pos);
+    });
+
+    var weakHead = document.createElement("h3");
+    weakHead.className = "mx-sub";
+    weakHead.textContent = "Weakest biases — where more examples would help most";
+    wrap.appendChild(weakHead);
+
+    var list = document.createElement("div");
+    list.className = "weak-list";
+    rows.slice(0, 12).forEach(function (p) {
+      var row = document.createElement("button");
+      row.type = "button";
+      row.className = "weak-row";
+      var nm = document.createElement("span");
+      nm.className = "weak-name";
+      nm.textContent = p.name;
+      var meta = document.createElement("span");
+      meta.className = "weak-meta";
+      meta.textContent = p.pos + " ex · " + p.neg + " counter";
+      var acc = document.createElement("span");
+      acc.className = "weak-acc";
+      acc.textContent = Math.round(p.accuracy * 100) + "%";
+      acc.title = "Found correctly in " + p.correct + " of " + p.tried +
+        " leave-one-out checks";
+      row.appendChild(nm);
+      row.appendChild(meta);
+      row.appendChild(acc);
+      row.addEventListener("click", function () {
+        var b = BIAS_BY_KEY[p.key];
+        if (b) jumpToBias(b);
+      });
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
+
+    var cov = document.createElement("p");
+    cov.className = "ov-note";
+    cov.textContent = "Accuracy against coverage, measured: " +
+      s.coverage.filter(function (c) { return c.n >= 20; }).map(function (c) {
+        return "at ≥" + Math.round(c.threshold * 100) + "% confidence it answers " +
+               (c.share * 100).toFixed(0) + "% of the time and is right " +
+               (c.accuracy * 100).toFixed(0) + "%";
+      }).join(" · ") + ".";
+    wrap.appendChild(cov);
+
+    return wrap;
+  }
+
   function buildModelPanel() {
     var wrap = document.createElement("div");
     wrap.className = "mx-panel";
@@ -1178,6 +1347,7 @@
     head.appendChild(buildSparkline(state.quality));
     grid.appendChild(head);
 
+    grid.appendChild(buildRetrievalPanel());
     grid.appendChild(buildModelPanel());
 
     var note = document.createElement("p");
@@ -1244,6 +1414,286 @@
         grid.appendChild(sec);
       });
     });
+  }
+
+  /* ============================================================
+     Test text — paste something, see what the dataset says about it.
+
+     Two rules this screen keeps:
+       • analysing text NEVER changes the dataset
+       • but correcting the result is always one click away, and the text
+         you were testing becomes the example. That is how realistic text
+         gets into a corpus that is otherwise full of short glosses.
+     ============================================================ */
+  var testState = { text: "", result: null, added: null };
+
+  function statusChrome(status) {
+    switch (status) {
+      case "ok":         return { cls: "st-ok",     label: "Likely bias identified" };
+      case "weak":       return { cls: "st-weak",   label: "Possible — not confident" };
+      case "ambiguous":  return { cls: "st-weak",   label: "Several biases fit equally" };
+      case "thin":       return { cls: "st-thin",   label: "Too few examples to be sure" };
+      case "unreliable": return { cls: "st-no",     label: "Unable to classify reliably" };
+      case "insufficient": return { cls: "st-no",   label: "Insufficient context" };
+      default:           return { cls: "st-idle",   label: "" };
+    }
+  }
+
+  function runTest(text) {
+    testState.text = text;
+    testState.added = null;
+    testState.result = (retrievalReady() && text.trim())
+      ? RETRIEVAL.query(text) : null;
+  }
+  /* Re-run against the rebuilt index without clearing the "added" note —
+     used after a curation action so the user sees their edit take effect. */
+  function runTestPreserving() {
+    testState.result = (retrievalReady() && testState.text.trim())
+      ? RETRIEVAL.query(testState.text) : null;
+  }
+
+  /* One-click correction: the tested text becomes a curated example. */
+  function acceptInto(biasKey, type) {
+    var bias = BIAS_BY_KEY[biasKey];
+    if (!bias || !testState.text.trim()) return;
+    addExample(bias, type, testState.text.trim());
+    testState.added = { name: bias.name, type: type };
+  }
+
+  function renderNeighbourList(host, neighbours, note) {
+    var wrap = document.createElement("div");
+    wrap.className = "nb-list";
+    if (note) {
+      var h = document.createElement("div");
+      h.className = "nb-note";
+      h.textContent = note;
+      wrap.appendChild(h);
+    }
+    neighbours.forEach(function (nb) {
+      var row = document.createElement("div");
+      row.className = "nb" + (nb.label === 0 ? " counter" : "");
+      var sim = document.createElement("span");
+      sim.className = "nb-sim";
+      sim.textContent = nb.similarity.toFixed(2);
+      sim.title = "Cosine similarity to your text";
+      var txt = document.createElement("span");
+      txt.className = "nb-text";
+      txt.textContent = nb.text;
+      var tag = document.createElement("span");
+      tag.className = "nb-tag";
+      tag.textContent = (nb.label === 0 ? "counter-example · " : "") + nb.biasName;
+      row.appendChild(sim);
+      row.appendChild(txt);
+      row.appendChild(tag);
+      wrap.appendChild(row);
+    });
+    host.appendChild(wrap);
+  }
+
+  function renderTest() {
+    catTitle.textContent = "Test text";
+    catMeta.textContent = retrievalReady()
+      ? "Analysed against " + RETRIEVAL.size + " curated examples across " +
+        RETRIEVAL.stats.biases + " biases · analysing never changes your dataset"
+      : "Building the index…";
+    if (legend) legend.style.display = "none";
+    grid.className = "testview";
+    grid.innerHTML = "";
+
+    /* ---- input ---- */
+    var box = document.createElement("div");
+    box.className = "test-box";
+    var ta = document.createElement("textarea");
+    ta.className = "test-input";
+    ta.rows = 4;
+    ta.placeholder = "Paste a sentence or a paragraph — an argument, an excerpt, " +
+      "something someone said — and see which biases it resembles.";
+    ta.value = testState.text;
+    var bar = document.createElement("div");
+    bar.className = "test-bar";
+    var go = document.createElement("button");
+    go.type = "button";
+    go.className = "btn save";
+    go.textContent = "Analyse";
+    var clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "btn cancel";
+    clear.textContent = "Clear";
+    var hint = document.createElement("span");
+    hint.className = "test-hint";
+    hint.textContent = "⌘/Ctrl + Enter";
+    bar.appendChild(hint);
+    bar.appendChild(clear);
+    bar.appendChild(go);
+    box.appendChild(ta);
+    box.appendChild(bar);
+    grid.appendChild(box);
+
+    function analyse() { runTest(ta.value); renderTest(); }
+    go.addEventListener("click", analyse);
+    clear.addEventListener("click", function () {
+      testState = { text: "", result: null, added: null };
+      renderTest();
+    });
+    ta.addEventListener("keydown", function (e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); analyse(); }
+    });
+
+    if (testState.added) {
+      var done = document.createElement("div");
+      done.className = "test-added";
+      done.textContent = "Added to your dataset as " +
+        (testState.added.type === "positive" ? "an example" : "a counter-example") +
+        " of “" + testState.added.name + "”. The index has been rebuilt.";
+      grid.appendChild(done);
+    }
+
+    var r = testState.result;
+    if (!r) {
+      if (!retrievalReady()) {
+        var w = document.createElement("p");
+        w.className = "ov-note";
+        w.textContent = "The retrieval index is still building.";
+        grid.appendChild(w);
+      }
+      return;
+    }
+
+    /* ---- verdict ---- */
+    var chrome = statusChrome(r.status);
+    var verdict = document.createElement("div");
+    verdict.className = "test-verdict " + chrome.cls;
+    var vh = document.createElement("div");
+    vh.className = "tv-head";
+    vh.textContent = chrome.label;
+    var vr = document.createElement("div");
+    vr.className = "tv-reason";
+    vr.textContent = r.reason || "";
+    verdict.appendChild(vh);
+    verdict.appendChild(vr);
+    var ev = document.createElement("div");
+    ev.className = "tv-ev";
+    ev.textContent = "Recognised " + r.evidence.known + " of " + r.evidence.terms +
+      " word patterns · closest match " + (r.evidence.maxSimilarity || 0).toFixed(2);
+    verdict.appendChild(ev);
+    grid.appendChild(verdict);
+
+    /* ---- candidates ---- */
+    if (r.candidates && r.candidates.length) {
+      var asserted = r.status === "ok" || r.status === "weak";
+      var head = document.createElement("h2");
+      head.className = "test-h";
+      head.textContent = asserted ? "Candidate biases"
+                                  : "Closest matches — context, not a prediction";
+      grid.appendChild(head);
+
+      r.candidates.forEach(function (c, i) {
+        var card = document.createElement("div");
+        card.className = "cand" + (i === 0 && asserted ? " lead" : "");
+
+        var top = document.createElement("div");
+        top.className = "cand-top";
+        var nm = document.createElement("button");
+        nm.type = "button";
+        nm.className = "cand-name";
+        nm.textContent = c.name;
+        nm.title = "Open this bias";
+        nm.addEventListener("click", function () {
+          var b = BIAS_BY_KEY[c.key];
+          if (b) jumpToBias(b);
+        });
+        var pct = document.createElement("span");
+        pct.className = "cand-pct";
+        pct.textContent = Math.round(c.confidence * 100) + "%";
+        pct.title = "Confidence, from measured accuracy at this similarity, " +
+          "scaled by how much of the evidence points here and how many " +
+          "examples this bias has.";
+        var sup = document.createElement("span");
+        sup.className = "cand-sup" + (c.thin ? " thin" : "");
+        sup.textContent = c.support + " example" + (c.support === 1 ? "" : "s");
+        if (c.thin) sup.title = "Too few examples to support a confident claim";
+        top.appendChild(nm);
+        top.appendChild(sup);
+        top.appendChild(pct);
+        card.appendChild(top);
+
+        var meter = document.createElement("div");
+        meter.className = "cand-meter";
+        var fill = document.createElement("i");
+        fill.style.width = Math.max(2, Math.round(c.share * 100)) + "%";
+        meter.appendChild(fill);
+        card.appendChild(meter);
+
+        var why = document.createElement("div");
+        why.className = "cand-why";
+        why.textContent = "Because your text is closest to these examples:";
+        card.appendChild(why);
+        renderNeighbourList(card, c.neighbours);
+
+        var act = document.createElement("div");
+        act.className = "cand-act";
+        var yes = document.createElement("button");
+        yes.type = "button";
+        yes.className = "btn tiny save";
+        yes.textContent = "✓ Correct — add as an example of this bias";
+        yes.addEventListener("click", function () { acceptInto(c.key, "positive"); renderTest(); });
+        var no = document.createElement("button");
+        no.type = "button";
+        no.className = "btn tiny";
+        no.textContent = "✕ Not this — add as a counter-example";
+        no.title = "Records that this text is NOT an instance of " + c.name;
+        no.addEventListener("click", function () { acceptInto(c.key, "negative"); renderTest(); });
+        act.appendChild(yes);
+        act.appendChild(no);
+        card.appendChild(act);
+
+        grid.appendChild(card);
+      });
+    } else if (r.neighbours && r.neighbours.length) {
+      var h2 = document.createElement("h2");
+      h2.className = "test-h";
+      h2.textContent = "Closest material in your dataset";
+      grid.appendChild(h2);
+      var host = document.createElement("div");
+      host.className = "cand";
+      renderNeighbourList(host, r.neighbours.slice(0, 6));
+      grid.appendChild(host);
+    }
+
+    /* ---- the curation escape hatch ---- */
+    if (testState.text.trim()) {
+      var other = document.createElement("div");
+      other.className = "test-other";
+      var lab = document.createElement("label");
+      lab.textContent = r.candidates && r.candidates.length
+        ? "None of these? File it under the right bias:"
+        : "Know which bias this is? File it and the model learns it:";
+      var sel = document.createElement("select");
+      sel.className = "test-select";
+      var blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = "Choose a bias…";
+      sel.appendChild(blank);
+      Object.keys(BIAS_BY_KEY).sort().forEach(function (k) {
+        var o = document.createElement("option");
+        o.value = k;
+        o.textContent = BIAS_BY_KEY[k].name;
+        sel.appendChild(o);
+      });
+      var add = document.createElement("button");
+      add.type = "button";
+      add.className = "btn tiny save";
+      add.textContent = "Add as example";
+      add.addEventListener("click", function () {
+        if (!sel.value) return;
+        acceptInto(sel.value, "positive");
+        renderTest();
+      });
+      other.appendChild(lab);
+      other.appendChild(sel);
+      other.appendChild(add);
+      grid.appendChild(other);
+    }
   }
 
   function jumpToBias(b) {
@@ -1386,6 +1836,7 @@
     });
 
     if (searching()) { renderSearch(searchInput.value.trim()); updateQualityBadge(); return; }
+    if (view.q === TEST_Q)     { renderTest();     updateQualityBadge(); return; }
     if (view.q === OVERVIEW_Q) { renderOverview(); updateQualityBadge(); return; }
 
     var quad = QUADRANTS[view.q];
@@ -1476,6 +1927,26 @@
     });
     otab.appendChild(obtn);
     navbar.appendChild(otab);
+
+    // 7th tab — test a piece of text against the dataset
+    var ttab = document.createElement("div");
+    ttab.className = "tab test-tab";
+    var tbtn = document.createElement("button");
+    tbtn.className = "tab-btn";
+    tbtn.type = "button";
+    var tlabel = document.createElement("span");
+    tlabel.textContent = "⌕ Test text";
+    tbtn.appendChild(tlabel);
+    tbtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      closeAllMenus();
+      if (searchInput) searchInput.value = "";
+      if (searchMeta) searchMeta.textContent = "";
+      view.q = TEST_Q;
+      render();
+    });
+    ttab.appendChild(tbtn);
+    navbar.appendChild(ttab);
   }
 
   /* ============================================================

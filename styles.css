@@ -524,6 +524,118 @@ a.cite:hover { opacity: .8; }
 .mx-w { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 720px) { .mx-cues { grid-template-columns: 1fr; } }
 
+/* ============================================================
+   Test view — paste text, see which biases it resembles
+   ============================================================ */
+.testview { display: block; max-width: 880px; }
+.test-box {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 14px 16px; margin-bottom: 16px;
+}
+.test-input {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  font: inherit; font-size: 14px; line-height: 1.55;
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  background: #fff; color: inherit;
+}
+.test-input:focus { outline: 2px solid #eab8cb; outline-offset: 1px; }
+.test-bar { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.test-hint { margin-right: auto; font-size: 11.5px; color: var(--muted); }
+.test-added {
+  background: #edf7ee; border: 1px solid #cfe6d2; color: #2c5c33;
+  border-radius: var(--radius); padding: 10px 14px; margin-bottom: 16px;
+  font-size: 13px;
+}
+.test-h { font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); margin: 20px 0 10px; }
+
+/* verdict banner — colour states never imply more than the status does */
+.test-verdict {
+  border-radius: var(--radius); padding: 14px 16px; margin-bottom: 6px;
+  border: 1px solid var(--line); background: var(--panel);
+}
+.tv-head { font-size: 15px; font-weight: 800; margin-bottom: 4px; }
+.tv-reason { font-size: 13px; line-height: 1.5; }
+.tv-ev { font-size: 11.5px; color: var(--muted); margin-top: 8px;
+  font-variant-numeric: tabular-nums; }
+.test-verdict.st-ok   { background: #edf7ee; border-color: #cfe6d2; }
+.test-verdict.st-ok   .tv-head { color: #2c6b38; }
+.test-verdict.st-weak { background: #fdf6e7; border-color: #f0e0b8; }
+.test-verdict.st-weak .tv-head { color: #8a6a12; }
+.test-verdict.st-thin { background: #fdf2f6; border-color: #f0d3e0; }
+.test-verdict.st-thin .tv-head { color: #93305c; }
+.test-verdict.st-no   { background: #f4f4f6; border-color: #e0e0e6; }
+.test-verdict.st-no   .tv-head { color: #4a4a55; }
+
+/* candidate cards */
+.cand {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px;
+}
+.cand.lead { border-color: #e3b7c9; box-shadow: 0 0 0 3px #fbeef3; }
+.cand-top { display: flex; align-items: baseline; gap: 10px; }
+.cand-name {
+  font-size: 15px; font-weight: 700; background: none; border: 0; padding: 0;
+  color: var(--ink); cursor: pointer; text-align: left;
+}
+.cand-name:hover { text-decoration: underline; }
+.cand-sup { font-size: 11.5px; color: var(--muted); }
+.cand-sup.thin { color: #a8501f; }
+.cand-pct { margin-left: auto; font-size: 17px; font-weight: 800;
+  font-variant-numeric: tabular-nums; }
+.cand-meter { height: 5px; border-radius: 3px; background: #eeeef1;
+  overflow: hidden; margin: 8px 0 10px; }
+.cand-meter i { display: block; height: 100%; background: #c23566; }
+.cand-why { font-size: 11.5px; color: var(--muted); margin-bottom: 6px; }
+.cand-act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.btn.tiny { font-size: 11.5px; padding: 4px 10px; }
+
+/* nearest-example evidence rows */
+.nb-list { display: flex; flex-direction: column; gap: 4px; }
+.nb-note { font-size: 11.5px; color: var(--muted); }
+.nb {
+  display: grid; grid-template-columns: 38px 1fr auto; gap: 8px;
+  align-items: baseline; font-size: 12.5px; line-height: 1.45;
+  padding: 5px 8px; border-radius: 7px; background: #fafafb;
+  border: 1px solid var(--line-soft);
+}
+.nb.counter { background: #f2f6fb; border-color: #dde7f2; }
+.nb-sim { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 11px; }
+.nb-tag { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+
+/* file-it-elsewhere row */
+.test-other {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  background: var(--panel); border: 1px dashed var(--line);
+  border-radius: var(--radius); padding: 12px 14px; margin-top: 14px;
+  font-size: 12.5px;
+}
+.test-select {
+  font: inherit; font-size: 12.5px; padding: 5px 8px;
+  border: 1px solid var(--line); border-radius: 7px; background: #fff;
+  max-width: 260px;
+}
+.mx-title { margin: 0 0 12px; font-size: 15px; }
+.mx-sub { margin: 16px 0 8px; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted); }
+.weak-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 6px; }
+.weak-row {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: #fcfcfd; cursor: pointer; font: inherit; font-size: 12.5px;
+}
+.weak-row:hover { border-color: #e3b7c9; background: #fff; }
+.weak-name { font-weight: 600; }
+.weak-meta { margin-left: auto; font-size: 11px; color: var(--muted); }
+.weak-acc { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 34px;
+  text-align: right; }
+@media (max-width: 640px) {
+  .nb { grid-template-columns: 32px 1fr; }
+  .nb-tag { grid-column: 2; }
+}
+
 /* ---------- Prediction readout in the edit / add forms ---------- */
 .ex-edit-auto .pred-dir {
   font-weight: 500; color: var(--muted); font-size: 11.5px;

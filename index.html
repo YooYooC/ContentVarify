@@ -8,7 +8,7 @@
        revalidate it; the assets below stay cacheable via their ?v= stamps. -->
   <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
   <title>Content Verify</title>
-  <link rel="stylesheet" href="styles.css?v=model2">
+  <link rel="stylesheet" href="styles.css?v=retr1">
 </head>
 <body>
   <header class="topbar">
@@ -75,13 +75,17 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 3. The bias dataset → window.BIAS_DATA -->
   <script src="data/biases.js"></script>
-  <!-- 4. The model — trains in the browser, defines window.CVModel -->
-  <script src="model.js?v=model2"></script>
+  <!-- 4. Encoder — text to vectors. Swap this to upgrade the representation. -->
+  <script src="encoder.js?v=retr1"></script>
+  <!-- 5. Retrieval — which bias is this? Answers only from your dataset. -->
+  <script src="retrieval.js?v=retr1"></script>
+  <!-- 6. Baseline model — binary bias/clear-thinking, kept for comparison -->
+  <script src="model.js?v=retr1"></script>
   <!-- 5. The app (defines window.CVApp, renders the UI) -->
-  <script src="app.js?v=model2"></script>
+  <script src="app.js?v=retr1"></script>
   <!-- 6. Export menu (CSV / Word / Google Sheets; uses CVApp.exportData) -->
-  <script src="export.js?v=model2"></script>
+  <script src="export.js?v=retr1"></script>
   <!-- 7. Shared cross-device sync (uses CVApp + Supabase; no-op until configured) -->
-  <script src="supabase-sync.js?v=model2"></script>
+  <script src="supabase-sync.js?v=retr1"></script>
 </body>
 </html>
