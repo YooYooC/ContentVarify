@@ -3,8 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- This file carries the legend wording and the ?v= tags for every other
+       asset, so a cached copy pins the whole app to an old build. Always
+       revalidate it; the assets below stay cacheable via their ?v= stamps. -->
+  <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
   <title>Content Verify</title>
-  <link rel="stylesheet" href="styles.css?v=addexample">
+  <link rel="stylesheet" href="styles.css?v=model1">
 </head>
 <body>
   <header class="topbar">
@@ -37,8 +41,11 @@
   <main class="page">
     <section class="legend">
       <div class="legend-head">
-        <h2>Bias colour scale</h2>
-        <p>White = clear thinking (0% biased) · dark pink = bias in full force (100%).</p>
+        <h2>Model reliability scale</h2>
+        <p>Every % is the trained model's reliability on that example — how
+           confidently a model fitted <em>without</em> it puts it back on its own
+           side. White = the model reads it as the opposite (0) · dark pink =
+           the model places it correctly and confidently (100).</p>
       </div>
       <div>
         <div class="legend-gradient">
@@ -48,7 +55,7 @@
           <span class="legend-tick" style="left:75%"><i></i><b>75</b></span>
           <span class="legend-tick" style="left:100%"><i></i><b>100</b></span>
         </div>
-        <div class="legend-labels"><span>Not biased</span><span>Most biased</span></div>
+        <div class="legend-labels"><span>Model can't place it</span><span>Model places it confidently</span></div>
       </div>
     </section>
 
@@ -66,11 +73,13 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 3. The bias dataset → window.BIAS_DATA -->
   <script src="data/biases.js"></script>
-  <!-- 4. The app (defines window.CVApp, renders the UI) -->
-  <script src="app.js?v=addexample">
-  <!-- 5. Export menu (CSV / Word / Google Sheets; uses CVApp.exportData) -->
-  <script src="export.js"></script>
-  <!-- 6. Shared cross-device sync (uses CVApp + Supabase; no-op until configured) -->
-  <script src="supabase-sync.js"></script>
+  <!-- 4. The model — trains in the browser, defines window.CVModel -->
+  <script src="model.js?v=model1"></script>
+  <!-- 5. The app (defines window.CVApp, renders the UI) -->
+  <script src="app.js?v=model1"></script>
+  <!-- 6. Export menu (CSV / Word / Google Sheets; uses CVApp.exportData) -->
+  <script src="export.js?v=model1"></script>
+  <!-- 7. Shared cross-device sync (uses CVApp + Supabase; no-op until configured) -->
+  <script src="supabase-sync.js?v=model1"></script>
 </body>
 </html>

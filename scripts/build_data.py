@@ -6,8 +6,15 @@ format-specific parser, but they all produce the same shape:
 
     quadrant -> categories -> biases -> {definition, positive[], negative[]}
 
-Every example is verbatim (only encoding artifacts are repaired and list
-numbering is stripped) and carries a 0-100 BIAS score used for colouring.
+Every example is verbatim — only encoding artifacts are repaired and list
+numbering is stripped.
+
+No scores are emitted here. Scores used to be assigned by a keyword table in
+this file, which was never trained or validated against anything. They are now
+produced by the model in model.js, which is fitted to these examples in the
+browser and cross-validated; the labels the model learns from are structural
+(positive[] = the bias in action, negative[] = clear thinking), so this file
+only has to get the text and the sides right.
 """
 import csv, json, re, os
 
@@ -57,52 +64,6 @@ def strip_enum(line):
 
 URL_RE = re.compile(r"(https?://\S+)\s*$")
 
-# ---------------------------------------------------------------------------
-# Scoring (0 = not biased / white, 100 = most biased / dark)
-# ---------------------------------------------------------------------------
-SEVERITY = [
-    "convinced", "certain", "certainty", "insist", "guaranteed", "guarantee",
-    "definitely", "refuse", "refused", "ignoring", "ignores", "ignored",
-    "dismiss", "no awareness", "fully", "confident", "confidently", "never",
-    "impossible", " must ", "always", "every ", " all ", "overwhelming",
-    "fabricat", "confabulat", "spontaneously", "vivid",
-]
-MILDNESS = [
-    "think", "thinking", "feel", "feeling", "assum", "might", "slight",
-    "minor", "small", "seem", "tend", "a bit", "briefly",
-]
-RIGOR = [
-    "comput", "calculat", "statistic", "bayes", "randomi", "controlled trial",
-    "margin of error", "power", "calibrat", "actuarial", "probabilit",
-    "base rate", "base-rate", "simulation", "regression", "sample size",
-    "meta-analys", "control chart", "runs test", "poisson", "evidence",
-    "data ", " data", "peer", "audit", "expected value", "monte carlo",
-    "significan", "fault-tree", "metrics", "records",
-]
-UNCERTAINTY = [
-    "don't know", "do not know", "not sure", "not certain", "uncertain",
-    "acknowledg", "might be", "can't tell", "cannot tell", "declined",
-    "refrain", "i'm not", "honestly can't", "wait", "weak and vague",
-    "not enough", "too small", "too short", "too few",
-]
-
-
-def _count(text, words):
-    t = " " + text.lower() + " "
-    return sum(1 for w in words if w in t)
-
-
-def score_example(text, kind):
-    if kind == "positive":   # the bias in action -> high / dark band
-        base = 70
-        score = base + 6 * _count(text, SEVERITY) - 4 * _count(text, MILDNESS)
-        return max(54, min(92, score))
-    else:                    # clear thinking -> low / white band
-        base = 26
-        score = base - 5 * _count(text, RIGOR) - 4 * _count(text, UNCERTAINTY)
-        return max(2, min(42, score))
-
-
 def make_item(text, kind):
     line = strip_enum(clean(text).strip())
     url = ""
@@ -112,7 +73,7 @@ def make_item(text, kind):
         line = line[:m.start()].strip()
     if not line:
         return None
-    return {"text": line, "url": url, "score": score_example(line, kind)}
+    return {"text": line, "url": url}
 
 
 def split_multiline(cell, kind):

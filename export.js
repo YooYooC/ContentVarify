@@ -21,8 +21,10 @@
   // Column order shared by CSV and the Google-Sheets clipboard copy.
   var COLS = [
     ["quadrant", "Quadrant"], ["category", "Category"], ["bias", "Bias"],
-    ["biasScore", "Bias score"], ["type", "Type"], ["text", "Text"],
-    ["score", "Score"], ["url", "URL"], ["excluded", "Excluded"]
+    ["biasReliability", "Model reliability % (bias average)"],
+    ["type", "Type"], ["text", "Text"],
+    ["reliability", "Model reliability % (example)"], ["verdict", "Model verdict"],
+    ["url", "URL"], ["excluded", "Excluded"]
   ];
 
   function data() {
@@ -75,8 +77,18 @@
       '<body style="font-family:Calibri,Arial,sans-serif;color:#1b1b1f;">' +
       '<h1 style="color:#b5174e;">Content Verify — bias library</h1>' +
       '<p style="color:#555;">Exported ' + esc(new Date().toLocaleString()) +
-      (d.overall != null ? ' · overall quality <b>' + esc(d.overall) + '</b>' : '') +
-      ' · ' + d.rows.length + ' rows</p>';
+      ' · ' + d.rows.length + ' rows</p>' +
+      (d.model
+        ? '<p style="color:#555;">Model quality <b>' + esc(d.model.quality) +
+          '%</b> (cross-validated balanced accuracy) · accuracy ' +
+          esc(d.model.accuracy) + '% · F1 ' + esc(d.model.f1) + '% · AUC ' +
+          esc(d.model.auc) + ' · log loss ' + esc(d.model.logLoss) +
+          ' · calibration error ' + esc(d.model.calibrationError) +
+          '% · fitted on ' + esc(d.model.trainedOn) + ' examples over ' +
+          esc(d.model.features) + ' features, ' + esc(d.model.folds) + '-fold CV.<br>' +
+          'Every score below is this model\'s reliability on that example — ' +
+          'the probability it assigns to the example\'s own label.</p>'
+        : '<p style="color:#a00;">No trained model was available at export time.</p>');
 
     var curQ = null, curC = null, open = false;
     function closeTable() { if (open) { h += '</table>'; open = false; } }
@@ -87,12 +99,14 @@
         h += '<table border="1" cellspacing="0" cellpadding="6" ' +
           'style="border-collapse:collapse;width:100%;font-size:10.5pt;">' +
           '<tr style="background:#f3d6e0;"><th align="left">Bias</th><th align="left">Type</th>' +
-          '<th align="left">Text</th><th>Score</th></tr>';
+          '<th align="left">Text</th><th>Model reliability</th><th align="left">Verdict</th></tr>';
         open = true;
       }
       var strike = r.excluded === "yes" ? 'color:#999;text-decoration:line-through;' : '';
       h += '<tr style="' + strike + '"><td>' + esc(r.bias) + '</td><td>' + esc(r.type) +
-        '</td><td>' + esc(r.text) + '</td><td align="center">' + esc(r.score) + '</td></tr>';
+        '</td><td>' + esc(r.text) + '</td><td align="center">' +
+        (r.reliability === "" ? "—" : esc(r.reliability) + "%") + '</td><td>' +
+        esc(r.verdict) + '</td></tr>';
     });
     closeTable();
     return h + '</body></html>';

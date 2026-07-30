@@ -23,10 +23,11 @@
      Persistence (no backend — everything lives in localStorage)
      ============================================================ */
   var STORE_KEY = "contentVerifyState.v1";
+  var MODEL_VERSION = 1;
   var state = loadState();
 
   function loadState() {
-    var base = { items: {}, quality: [], added: {} };
+    var base = { items: {}, quality: [], added: {}, modelVersion: MODEL_VERSION };
     try {
       var raw = localStorage.getItem(STORE_KEY);
       if (raw) {
@@ -34,23 +35,51 @@
         base.items = p.items || {};
         base.quality = p.quality || [];
         base.added = p.added || {};
+        base.modelVersion = p.modelVersion || 0;
       }
     } catch (e) {}
-    return base;
+    return migrate(base);
+  }
+
+  /* Scores used to be hand-assigned "% biased" numbers stored per item.
+     They are now derived from the trained model, so stored scores are
+     dropped and the quality history — which tracked a different quantity
+     entirely — is cleared. Text edits, exclusions and added examples all
+     survive: those are the curation work worth keeping. */
+  function migrate(s) {
+    if (s.modelVersion === MODEL_VERSION) return s;
+    Object.keys(s.items).forEach(function (id) {
+      var o = s.items[id];
+      if (!o) return;
+      delete o.score;
+      (o.history || []).forEach(function (h) { delete h.score; });
+    });
+    Object.keys(s.added).forEach(function (bid) {
+      var store = s.added[bid] || {};
+      ["positive", "negative"].forEach(function (t) {
+        (store[t] || []).forEach(function (rec) { delete rec.score; });
+      });
+    });
+    s.quality = [];
+    s.modelVersion = MODEL_VERSION;
+    return s;
+  }
+
+  function payload() {
+    return { items: state.items, quality: state.quality, added: state.added,
+             modelVersion: state.modelVersion };
   }
   function persistLocal() {
-    try {
-      localStorage.setItem(STORE_KEY,
-        JSON.stringify({ items: state.items, quality: state.quality,
-                        added: state.added }));
-    } catch (e) {}
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(payload())); }
+    catch (e) {}
   }
   function save() {
     persistLocal();
     // Notify the optional cloud-sync layer (supabase-sync.js) so the change
     // propagates to the user's other devices. No-op when sync isn't wired up.
+    // Added examples ride along — they are training data like any other.
     if (window.CVApp && typeof CVApp._onSave === "function") {
-      try { CVApp._onSave({ items: state.items, quality: state.quality }); }
+      try { CVApp._onSave(payload()); }
       catch (e) {}
     }
   }
@@ -61,9 +90,7 @@
      ------------------------------------------------------------ */
   window.CVApp = {
     // Current persisted payload (exactly what save() writes).
-    getState: function () {
-      return { items: state.items, quality: state.quality, added: state.added };
-    },
+    getState: payload,
     // Adopt a copy pulled from the cloud, cache it locally, then repaint.
     // Uses persistLocal() (not save()) so adopting a remote copy never
     // bounces straight back out as a push.
@@ -72,29 +99,34 @@
       state.items = incoming.items || {};
       state.quality = incoming.quality || [];
       state.added = incoming.added || {};
+      state.modelVersion = incoming.modelVersion || 0;
+      migrate(state);
       injectAdded();   // re-materialise user-added examples from the new state
       persistLocal();
       render();
-      updateQualityBadge();
+      scheduleTrain(); // the corpus changed → the model must be refitted
     },
     // Set by the sync layer; called after every local save() with the payload.
     _onSave: null,
 
     // Flattened, fully-computed snapshot for exporting (spreadsheet / doc).
-    // Honours every override, score, and exclusion currently in effect.
+    // Every number is the trained model's, not a stored constant.
     exportData: function () {
       var rows = [];
+      var r1 = function (v) { return v == null ? "" : Math.round(v * 10) / 10; };
       QUADRANTS.forEach(function (q) {
         (q.categories || []).forEach(function (c) {
           (c.biases || []).forEach(function (b) {
-            var a = avgBias(b);
-            var bscore = a == null ? "" : Math.round(a);
+            var a = avgReliability(b);
             var add = function (list, type) {
               (list || []).forEach(function (it) {
+                var rel = reliability(it);
                 rows.push({
                   quadrant: q.name, category: c.name, bias: b.name,
-                  biasScore: bscore, type: type,
-                  text: effText(it), score: effScore(it),
+                  biasReliability: a == null ? "" : Math.round(a), type: type,
+                  text: effText(it),
+                  reliability: rel == null ? "" : Math.round(rel),
+                  verdict: verdictOf(it),
                   url: it.url || "", excluded: isExcluded(it) ? "yes" : ""
                 });
               });
@@ -104,8 +136,18 @@
           });
         });
       });
-      var oq = overallQuality();
-      return { rows: rows, overall: oq == null ? null : Math.round(oq * 10) / 10 };
+      var m = MODEL && MODEL.ready ? MODEL.metrics : null;
+      return {
+        rows: rows,
+        overall: m ? r1(m.balanced * 100) : null,
+        model: m ? {
+          quality: r1(m.balanced * 100), accuracy: r1(m.accuracy * 100),
+          f1: r1(m.f1 * 100), auc: m.auc == null ? null : Math.round(m.auc * 1000) / 1000,
+          logLoss: Math.round(m.logLoss * 1000) / 1000,
+          calibrationError: r1(m.ece * 100),
+          trainedOn: m.docs, features: m.features, folds: m.folds
+        } : null
+      };
     }
   };
 
@@ -114,6 +156,10 @@
   /* ============================================================
      Index every example with a stable id so marks/edits survive
      reloads. id = "qi.ci.bi:p<idx>" (pos) or ":n<idx>" (neg).
+
+     __label is the supervised target the model is trained against:
+       1 = an example of the bias in action
+       0 = a counter-example (clear thinking)
      ============================================================ */
   var ITEMS = {};
   QUADRANTS.forEach(function (q, qi) {
@@ -125,11 +171,13 @@
         (b.positive || []).forEach(function (it, idx) {
           var id = biasId + ":p" + idx;
           it.__id = id;
+          it.__label = 1;
           ITEMS[id] = { item: it, biasId: biasId };
         });
         (b.negative || []).forEach(function (it, idx) {
           var id = biasId + ":n" + idx;
           it.__id = id;
+          it.__label = 0;
           ITEMS[id] = { item: it, biasId: biasId };
         });
       });
@@ -152,8 +200,8 @@
     });
     function fill(recs, arr, biasId, tag) {
       (recs || []).forEach(function (rec, idx) {
-        var it = { text: rec.text, score: rec.score, url: rec.url || "",
-                   __added: true };
+        var it = { text: rec.text, url: rec.url || "", __added: true,
+                   __label: tag === "pa" ? 1 : 0 };
         var id = biasId + ":" + tag + idx;
         it.__id = id;
         arr.push(it);
@@ -177,8 +225,9 @@
   injectAdded();
 
   /* ============================================================
-     Bias color scale (matches the legend gradient)
-       0 = white     (0% biased)        1 = dark pink (100% biased)
+     Reliability colour scale (matches the legend gradient)
+       0 = white  (model can't place this example)
+       1 = dark pink  (model places it correctly and confidently)
      ============================================================ */
   var STOPS = [
     [0.0, [255, 255, 255]],
@@ -210,18 +259,13 @@
   }
 
   /* ============================================================
-     Effective accessors — an item's current text/score honour any
-     stored override; otherwise fall back to the original data.
+     Effective accessors — an item's current text honours any stored
+     override; otherwise fall back to the original data.
      ============================================================ */
   function ov(id) { return state.items[id]; }
   function effText(item) {
     var o = ov(item.__id);
     return o && o.text != null ? o.text : item.text;
-  }
-  function effScore(item) {
-    var o = ov(item.__id);
-    var s = o && o.score != null ? o.score : item.score;
-    return typeof s === "number" ? s : 50;
   }
   function isExcluded(item) {
     var o = ov(item.__id);
@@ -231,96 +275,138 @@
     var o = ov(item.__id);
     return (o && o.history) || [];
   }
-
-  /* ============================================================
-     Scoring
-       Average one single bias = (avg examples + inverse avg
-       counter-examples) / 2, where inverse(x) = 100 - x.
-       Crossed-out (excluded) items are dropped before averaging.
-     ============================================================ */
   function mean(arr) {
     if (!arr.length) return null;
     var s = 0;
     for (var i = 0; i < arr.length; i++) s += arr[i];
     return s / arr.length;
   }
-  function keptScores(list) {
+
+  /* ============================================================
+     THE MODEL
+
+     Every number in this app comes from here. model.js fits a
+     logistic-regression text classifier to the curated corpus —
+     examples of a bias (label 1) against counter-examples (label 0) —
+     and cross-validates it, so each example also gets an out-of-fold
+     prediction from a model that never saw it during training.
+
+     Ticking ✕ takes an example out of the training set; editing or
+     adding one changes what the model is fitted to. Either way the
+     model is refitted and every score on screen is re-derived.
+     ============================================================ */
+  var MODEL = null;         // last training run (see CVModel.train)
+  var trainState = "idle";  // "idle" | "training" | "ready" | "unavailable"
+  var trainTimer = null;
+
+  /* The training set: every example the user hasn't taken out, at its
+     current wording. */
+  function trainingDocs() {
+    var docs = [];
+    Object.keys(ITEMS).forEach(function (id) {
+      var it = ITEMS[id].item;
+      if (isExcluded(it)) return;
+      docs.push({ id: id, text: effText(it), label: it.__label });
+    });
+    return docs;
+  }
+
+  function trainNow() {
+    trainTimer = null;
+    if (!window.CVModel) { trainState = "unavailable"; repaintScores(); return; }
+    MODEL = window.CVModel.train(trainingDocs());
+    trainState = MODEL.ready ? "ready" : "unavailable";
+    recordQuality();
+    repaintScores();
+  }
+  /* Debounced so a burst of clicks costs one fit, and deferred a tick so
+     the click that triggered it paints first. */
+  function scheduleTrain() {
+    trainState = "training";
+    updateQualityBadge();
+    clearTimeout(trainTimer);
+    trainTimer = setTimeout(trainNow, 140);
+  }
+  function modelReady() { return !!(MODEL && MODEL.ready); }
+
+  /* ------------------------------------------------------------
+     Reliability — the score shown on every example.
+
+     P = the model's probability that a text shows the bias in action.
+     An example's reliability is the probability the model assigns to
+     that example's OWN label, as a percentage:
+
+       100  the model recognises it immediately — a clean, characteristic
+            example the model can learn the pattern from
+        50  the model is undecided — the example carries no usable signal
+         0  the model reads it as the opposite class — ambiguous, or
+            filed on the wrong side
+
+     Taken from the out-of-fold prediction wherever one exists, so an
+     example is never graded by a model that memorised it.
+     ------------------------------------------------------------ */
+  function probOf(item) {
+    if (!modelReady()) return null;
+    var p = MODEL.oof[item.__id];
+    if (p == null) p = MODEL.predict(effText(item));  // excluded / just added
+    return p;
+  }
+  function reliabilityFromP(p, label) {
+    return p == null ? null : 100 * (label === 1 ? p : 1 - p);
+  }
+  function reliability(item) { return reliabilityFromP(probOf(item), item.__label); }
+  function reliabilityOfText(text, label) {
+    return modelReady() ? reliabilityFromP(MODEL.predict(text), label) : null;
+  }
+  function heldOut(item) { return modelReady() && MODEL.oof[item.__id] != null; }
+
+  /* Plain-language read of what the model made of an example. */
+  function verdictOf(item) {
+    var r = reliability(item);
+    if (r == null) return "";
+    if (r >= 85) return "model agrees, confidently";
+    if (r >= 65) return "model agrees";
+    if (r > 50)  return "model leans agree";
+    if (r === 50) return "model undecided";
+    if (r > 35)  return "model leans disagree";
+    if (r > 15)  return "model disagrees";
+    return "model disagrees, confidently";
+  }
+
+  /* A bias's score = mean reliability of the examples still in the
+     training set, across both lists. */
+  function keptReliability(list) {
     var out = [];
     (list || []).forEach(function (it) {
-      if (!isExcluded(it)) out.push(effScore(it));
+      if (isExcluded(it)) return;
+      var r = reliability(it);
+      if (r != null) out.push(r);
     });
     return out;
   }
-  /* ----------------------------------------------------------------
-     Algorithmic bias scorer.
-     The score (0 = clear thinking … 100 = bias in full force) is
-     produced from the text itself — never typed by the user. It is a
-     deterministic lexical heuristic: assertive / fabrication / pattern-
-     seeking language pushes the score up; hedging / evidence / base-rate
-     language pulls it down. Re-run whenever an example is reformulated.
-     ---------------------------------------------------------------- */
-  var BIAS_UP = [
-    ["invent", 12], ["fabricat", 14], ["made up", 12], ["make up", 10],
-    ["making up", 10], ["confident", 12], ["obvious", 10], ["always", 8],
-    ["never", 8], ["everyone", 8], ["definitely", 10], ["certainly", 9],
-    ["clearly", 8], ["plausible", 9], ["assume", 8], ["believe", 7],
-    ["imagine", 8], ["story", 6], ["stories", 6], ["false ", 8],
-    ["pattern", 5], ["lucky", 6], ["fate", 6], ["meant to", 6],
-    ["destined", 7], ["must be", 7], ["proves", 8], ["guarantee", 8]
-  ];
-  var BIAS_DOWN = [
-    ["uncertain", 14], ["admit", 12], ["acknowledg", 12],
-    ["don't remember", 14], ["don't know", 12], ["not sure", 12],
-    ["check", 10], ["verif", 10], ["evidence", 12], ["data", 10],
-    ["probabilit", 12], ["accurate", 12], ["true reason", 12],
-    ["correctly", 10], ["rather than", 8], ["avoid", 6], ["notice", 6],
-    ["recogniz", 8], ["recognis", 8], ["base rate", 12], ["random", 8],
-    ["coincidence", 10], ["sample size", 10], ["actual", 6]
-  ];
-  function computeBiasScore(text) {
-    var t = " " + String(text || "").toLowerCase() + " ";
-    var score = 50;
-    BIAS_UP.forEach(function (p) { if (t.indexOf(p[0]) >= 0) score += p[1]; });
-    BIAS_DOWN.forEach(function (p) { if (t.indexOf(p[0]) >= 0) score -= p[1]; });
-    return Math.max(0, Math.min(100, Math.round(score)));
+  function avgReliability(b) {
+    return mean(keptReliability(b.positive).concat(keptReliability(b.negative)));
   }
 
-  function avgBias(b) {
-    var ex = mean(keptScores(b.positive));
-    var ct = mean(keptScores(b.negative));
-    if (ex != null && ct != null) return (ex + (100 - ct)) / 2;
-    if (ex != null) return ex;          // only examples present
-    if (ct != null) return 100 - ct;    // only counter-examples present
-    return null;                        // nothing to score
-  }
-  function overallQuality() {
-    var vals = [];
-    QUADRANTS.forEach(function (q) {
-      q.categories.forEach(function (c) {
-        c.biases.forEach(function (b) {
-          var a = avgBias(b);
-          if (a != null) vals.push(a);
-        });
-      });
-    });
-    return mean(vals);
+  /* Headline model quality: cross-validated balanced accuracy — how often
+     the held-out model gets an example right, weighted so the larger
+     class can't flatter it. */
+  function modelQuality() {
+    return modelReady() ? MODEL.metrics.balanced * 100 : null;
   }
 
-  /* ---- quality change tracking ---- */
+  /* ---- model-quality change tracking ---- */
   function recordQuality() {
-    var v = overallQuality();
+    var v = modelQuality();
     if (v == null) return;
     var h = state.quality;
     var last = h.length ? h[h.length - 1].value : null;
-    // Record on any change. With ~240 biases a single edit barely moves the
-    // global mean, so a threshold here would make change-tracking look dead.
     if (last == null || Math.abs(v - last) > 1e-9) {
       h.push({ ts: Date.now(), value: v });
       if (h.length > 400) h.shift();
       save();
     }
   }
-  if (!state.quality.length) recordQuality();
 
   /* ============================================================
      Mutations
@@ -331,18 +417,17 @@
   }
   function cleanOv(id) {
     var o = state.items[id];
-    if (o && !o.excluded && o.text == null && o.score == null &&
+    if (o && !o.excluded && o.text == null &&
         !(o.history && o.history.length)) {
       delete state.items[id];
     }
   }
+  /* Every mutation changes the training set, so every mutation refits the
+     model — that is the whole point of the ✓/✕ marks. */
   function afterMutation(id) {
     save();
-    recordQuality();
     rebuildItem(id);
-    refreshBias(ITEMS[id].biasId);
-    updateQualityBadge();
-    if (view.q === OVERVIEW_Q && !searching()) renderOverview();
+    scheduleTrain();
   }
   function setExcluded(item, val) {
     var o = getOv(item.__id);
@@ -350,44 +435,39 @@
     cleanOv(item.__id);
     afterMutation(item.__id);
   }
-  function applyEdit(item, newText, newScore) {
-    var curText = effText(item), curScore = effScore(item);
-    if (newText === curText && newScore === curScore) return false;
+  function applyEdit(item, newText) {
+    var curText = effText(item);
+    if (newText === curText) return false;
     var o = getOv(item.__id);
     if (!o.history) o.history = [];
-    o.history.push({ text: curText, score: curScore, ts: Date.now() });
+    o.history.push({ text: curText, ts: Date.now() });
     o.text = newText;
-    o.score = newScore;
     afterMutation(item.__id);
     return true;
   }
 
   /* Add a brand-new example to a bias. `type` is "positive" (example of
-     the bias) or "negative" (counter-example). The score is produced by
-     the project's scoring model — computeBiasScore() — from the text,
-     never typed by the user, so a new example is judged by the very same
-     criteria as every built-in one. Returns the live item so the caller
-     can render it. */
+     the bias) or "negative" (counter-example). No score is stored: the
+     example joins the training set, the model is refitted, and its
+     reliability is derived like every other example's. Returns the live
+     item so the caller can render it. */
   function addExample(bias, type, text) {
     var biasId = bias.__id;
-    var score = computeBiasScore(text);
     if (!state.added[biasId]) state.added[biasId] = { positive: [], negative: [] };
     var store = state.added[biasId];
     if (!store[type]) store[type] = [];
     var idx = store[type].length;
-    store[type].push({ text: text, score: score, url: "" });
+    store[type].push({ text: text, url: "" });
 
-    var it = { text: text, score: score, url: "", __added: true };
+    var it = { text: text, url: "", __added: true,
+               __label: type === "positive" ? 1 : 0 };
     var id = biasId + ":" + (type === "positive" ? "pa" : "na") + idx;
     it.__id = id;
     bias[type].push(it);
     ITEMS[id] = { item: it, biasId: biasId };
 
     save();
-    recordQuality();
-    refreshBias(biasId);
-    updateQualityBadge();
-    if (view.q === OVERVIEW_Q && !searching()) renderOverview();
+    scheduleTrain();
     return it;
   }
 
@@ -408,6 +488,14 @@
     var fns = chipRefresh[biasId];
     if (fns) fns.forEach(function (f) { f(); });
   }
+  /* After a refit every score on screen is stale — repaint them in place
+     rather than re-rendering, so open cards and scroll position survive. */
+  function repaintScores() {
+    if (view.q === OVERVIEW_Q && !searching()) { renderOverview(); updateQualityBadge(); return; }
+    Object.keys(itemNodes).forEach(rebuildItem);
+    Object.keys(chipRefresh).forEach(refreshBias);
+    updateQualityBadge();
+  }
 
   /* ============================================================
      Time helpers
@@ -427,14 +515,14 @@
      ============================================================ */
   function makeItem(item) {
     var id = item.__id;
-    var score = effScore(item);
+    var rel = reliability(item);
     var excluded = isExcluded(item);
-    var value = score / 100;
+    var value = rel == null ? 0 : rel / 100;
 
     var li = document.createElement("li");
     li.className = "ex-item" + (excluded ? " excluded" : "");
     li.dataset.id = id;
-    if (!excluded) {
+    if (!excluded && rel != null) {
       li.style.background = colorFor(value);
       if (value > 0.62) li.classList.add("dark");
     }
@@ -462,9 +550,20 @@
     ctrls.className = "ex-ctrls";
 
     var badge = document.createElement("span");
-    badge.className = "score" + (!excluded && value > 0.6 ? " on-dark" : "");
-    badge.textContent = score + "%";
-    badge.title = score + "% biased — 0 = not biased, 100 = most biased";
+    badge.className = "score" + (!excluded && rel != null && value > 0.6 ? " on-dark" : "");
+    badge.textContent = rel == null
+      ? (trainState === "training" ? "…" : "—")
+      : Math.round(rel) + "%";
+    badge.title = rel == null
+      ? "No model yet — nothing to report"
+      : "Model reliability " + Math.round(rel) + "% — " + verdictOf(item) +
+        " that this is " + (item.__label === 1 ? "an example of the bias" :
+                            "clear thinking") + ".\n" +
+        (excluded
+          ? "Out of the training set, so this is a straight prediction."
+          : heldOut(item)
+            ? "Measured out-of-fold: predicted by a model trained without it."
+            : "Predicted by the current model.");
 
     var hist = histOf(item);
     var histBtn = null;
@@ -481,13 +580,13 @@
     keep.type = "button";
     keep.className = "ic keep" + (excluded ? "" : " on");
     keep.textContent = "✓";
-    keep.title = "Keep in training set";
+    keep.title = "Keep in the training set — the model learns from this example";
 
     var drop = document.createElement("button");
     drop.type = "button";
     drop.className = "ic drop" + (excluded ? " on" : "");
     drop.textContent = "✕";
-    drop.title = "Take out of training set (excluded from scores)";
+    drop.title = "Take out of the training set — the model is refitted without it";
 
     keep.addEventListener("click", function (e) { e.stopPropagation(); setExcluded(item, false); });
     drop.addEventListener("click", function (e) { e.stopPropagation(); setExcluded(item, true); });
@@ -523,10 +622,18 @@
     var wrap = document.createElement("div");
     wrap.className = "hist-panel";
 
-    var scores = hist.map(function (h) { return h.score; }).concat([effScore(item)]);
+    // Every version is re-scored by the CURRENT model, so the trajectory
+    // is a like-for-like comparison of the wordings themselves.
+    var relOf = function (txt) {
+      var r = reliabilityOfText(txt, item.__label);
+      return r == null ? "—" : Math.round(r);
+    };
+    var scores = hist.map(function (h) { return relOf(h.text); })
+                     .concat([relOf(effText(item))]);
     var traj = document.createElement("div");
     traj.className = "hist-traj";
-    traj.textContent = "Score history:  " + scores.join("  →  ");
+    traj.textContent = "Model reliability by version:  " + scores.join("  →  ");
+    traj.title = "Each wording scored by the model as it stands now";
     wrap.appendChild(traj);
 
     var list = document.createElement("ol");
@@ -536,7 +643,7 @@
       var liH = document.createElement("li");
       var meta = document.createElement("div");
       meta.className = "hist-meta";
-      meta.textContent = "v" + (i + 1) + " · " + h.score + "% · " + timeAgo(h.ts);
+      meta.textContent = "v" + (i + 1) + " · " + relOf(h.text) + "% · " + timeAgo(h.ts);
       meta.title = new Date(h.ts).toLocaleString();
       var body = document.createElement("div");
       body.className = "hist-body";
@@ -557,8 +664,7 @@
     form.className = "ex-edit";
 
     var origText = effText(item);
-    var baseScore = effScore(item);          // the trusted score we anchor to
-    var baseHeur = computeBiasScore(origText); // heuristic reading of the original
+    var baseRel = reliability(item);
 
     var ta = document.createElement("textarea");
     ta.className = "ex-edit-text";
@@ -568,22 +674,24 @@
     var row = document.createElement("div");
     row.className = "ex-edit-row";
 
-    // Score is set by the algorithm — but only as an ADJUSTMENT to the
-    // existing score, so unchanged text never moves the number.
-    function projectedScore(txt) {
-      return Math.max(0, Math.min(100,
-        baseScore + (computeBiasScore(txt) - baseHeur)));
-    }
+    /* Live reading from the trained model as you reformulate. It is a
+       prediction, not the saved figure: saving refits the model, and the
+       example's final score comes from the held-out fold. */
     var auto = document.createElement("span");
     auto.className = "ex-edit-auto";
     function refreshAuto() {
-      var changed = ta.value.trim() !== origText;
-      var s = changed ? projectedScore(ta.value.trim()) : baseScore;
-      auto.innerHTML = 'Algorithm score: <b>' + s + '%</b>';
-      auto.classList.toggle("moved", changed && s !== baseScore);
+      var txt = ta.value.trim();
+      var changed = txt !== origText;
+      var s = changed ? reliabilityOfText(txt, item.__label) : baseRel;
+      auto.innerHTML = 'Model reliability: <b>' +
+        (s == null ? "—" : Math.round(s) + "%") + '</b>';
+      auto.classList.toggle("moved",
+        changed && s != null && baseRel != null && Math.round(s) !== Math.round(baseRel));
       auto.title = changed
-        ? "Adjusted automatically from your edit (was " + baseScore + "%)"
-        : "Unchanged — edit the text and the algorithm re-scores it";
+        ? "The model's read on this wording" +
+          (baseRel == null ? "" : " (was " + Math.round(baseRel) + "%)") +
+          " — saving refits the model on it"
+        : "Unchanged — reword it and the model re-reads it live";
     }
     refreshAuto();
     ta.addEventListener("input", refreshAuto);
@@ -607,8 +715,8 @@
     saveBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       var nt = ta.value.trim();
-      // No text change → no re-score, no history entry.
-      if (nt && nt !== origText && applyEdit(item, nt, projectedScore(nt))) return;
+      // No text change → no refit, no history entry.
+      if (nt && nt !== origText && applyEdit(item, nt)) return;
       close();
     });
   }
@@ -621,8 +729,8 @@
   }
 
   /* "Add example" affordance shown under each list. Clicking reveals an
-     inline editor with a live score preview (from the same scoring model);
-     saving appends the new example to the list and re-scores the bias. */
+     inline editor showing what the model currently makes of the text;
+     saving adds it to the training set and refits the model. */
   function buildAdder(bias, type, ul) {
     var wrap = document.createElement("div");
     wrap.className = "add-ex";
@@ -652,13 +760,23 @@
       var row = document.createElement("div");
       row.className = "ex-edit-row";
 
+      var label = type === "positive" ? 1 : 0;
       var auto = document.createElement("span");
       auto.className = "ex-edit-auto";
       function refreshAuto() {
         var t = ta.value.trim();
-        auto.innerHTML = 'Algorithm score: <b>' +
-          (t ? computeBiasScore(t) : "—") + (t ? '%' : '') + '</b>';
-        auto.title = "Scored automatically by the model from your text";
+        var r = t ? reliabilityOfText(t, label) : null;
+        auto.innerHTML = 'Model reliability: <b>' +
+          (r == null ? "—" : Math.round(r) + "%") + '</b>';
+        auto.classList.toggle("moved", r != null && r < 50);
+        auto.title = r == null
+          ? "The model reads your text as you type"
+          : r < 50
+            ? "The model currently reads this as the OPPOSITE class — a " +
+              "surprising example, which is exactly what teaches it something new."
+            : "How confidently the model already classifies this as " +
+              (label ? "an example of the bias" : "clear thinking") +
+              ". Adding it refits the model.";
       }
       refreshAuto();
       ta.addEventListener("input", refreshAuto);
@@ -735,13 +853,15 @@
     head.appendChild(chev);
 
     function refresh() {
-      var a = avgBias(bias);
+      var a = avgReliability(bias);
       if (a == null) {
-        pill.textContent = "—";
+        pill.textContent = trainState === "training" ? "…" : "—";
         pill.style.background = "#ececef";
         pill.classList.remove("dark");
         bar.style.background = "#dcdce0";
-        pill.title = "No scorable examples";
+        pill.title = trainState === "training"
+          ? "Refitting the model…"
+          : "No examples in the training set for this bias";
         return;
       }
       var col = colorFor(a / 100);
@@ -749,8 +869,8 @@
       pill.style.background = col;
       bar.style.background = col;
       pill.classList.toggle("dark", a / 100 > 0.6);
-      pill.title = "Average one single bias = " + a.toFixed(1) +
-        "  (avg examples + inverse avg counter-examples) / 2";
+      pill.title = "Model reliability on this bias = " + a.toFixed(1) + "%" +
+        " — mean across its examples and counter-examples in the training set";
     }
     refresh();
     (chipRefresh[bias.__id] = chipRefresh[bias.__id] || []).push(refresh);
@@ -796,7 +916,8 @@
   function renderCategory(quadName, cat) {
     catTitle.textContent = cat.name;
     catMeta.textContent = quadName + " · " + cat.biases.length +
-      " biases · double-click an example to edit · ✓ keep / ✕ take out";
+      " biases · every % is the model's reliability · double-click an " +
+      "example to reword it · ✓ keep / ✕ take out of the training set";
     grid.className = "grid";
     grid.innerHTML = "";
     cat.biases.forEach(function (b) { grid.appendChild(makeCard(b)); });
@@ -855,7 +976,8 @@
     var wrap = document.createElement("div");
     wrap.className = "spark";
     if (!h || h.length < 2) {
-      wrap.textContent = "No changes tracked yet — mark or edit an example to start.";
+      wrap.textContent = "One fit so far — curate the training set and the " +
+        "model's quality is re-measured here.";
       return wrap;
     }
     var vals = h.map(function (e) { return e.value; });
@@ -878,36 +1000,134 @@
     return wrap;
   }
 
+  /* One metric tile in the model panel. */
+  function metricTile(label, value, hint) {
+    var t = document.createElement("div");
+    t.className = "mx-tile";
+    var l = document.createElement("span");
+    l.className = "mx-lab";
+    l.textContent = label;
+    var v = document.createElement("span");
+    v.className = "mx-val";
+    v.textContent = value;
+    t.appendChild(l);
+    t.appendChild(v);
+    if (hint) t.title = hint;
+    return t;
+  }
+
+  function buildModelPanel() {
+    var wrap = document.createElement("div");
+    wrap.className = "mx-panel";
+
+    if (!modelReady()) {
+      var p = document.createElement("p");
+      p.className = "ov-note";
+      p.textContent = trainState === "training"
+        ? "Fitting the model to the training set…"
+        : (MODEL && MODEL.reason) ||
+          "No model — model.js didn't load, so there is nothing to report.";
+      wrap.appendChild(p);
+      return wrap;
+    }
+
+    var m = MODEL.metrics;
+    var tiles = document.createElement("div");
+    tiles.className = "mx-tiles";
+    tiles.appendChild(metricTile("Accuracy", (m.accuracy * 100).toFixed(1) + "%",
+      "Share of held-out examples the model classifies correctly."));
+    tiles.appendChild(metricTile("F1", (m.f1 * 100).toFixed(1) + "%",
+      "Harmonic mean of precision (" + (m.precision * 100).toFixed(1) +
+      "%) and recall (" + (m.recall * 100).toFixed(1) + "%)."));
+    tiles.appendChild(metricTile("ROC AUC", m.auc == null ? "—" : m.auc.toFixed(3),
+      "Probability the model ranks a random bias example above a random " +
+      "counter-example. 0.5 = coin flip, 1.0 = perfect."));
+    tiles.appendChild(metricTile("Log loss", m.logLoss.toFixed(3),
+      "Penalty for confident mistakes. Lower is better; 0.693 = no better than guessing."));
+    tiles.appendChild(metricTile("Calibration error", (m.ece * 100).toFixed(1) + "%",
+      "How far the model's stated confidence drifts from how often it is " +
+      "actually right. Lower means the % on each example can be taken at face value."));
+    tiles.appendChild(metricTile("Training set", m.docs.toLocaleString(),
+      m.pos.toLocaleString() + " examples of bias · " + m.neg.toLocaleString() +
+      " counter-examples · " + m.features.toLocaleString() + " learned features"));
+    wrap.appendChild(tiles);
+
+    var how = document.createElement("p");
+    how.className = "ov-note";
+    how.textContent =
+      "Logistic regression over word and two-word features (TF-IDF), " +
+      "class-balanced, measured by " + m.folds + "-fold cross-validation: every " +
+      "example is scored by a model fitted without it. Quality above is " +
+      "balanced accuracy. Curating the set — ✕ to drop a weak example, " +
+      "rewording an unclear one, adding a new one — refits the model and moves these numbers.";
+    wrap.appendChild(how);
+
+    /* What the model actually learned. Worth showing: these weights are
+       fitted from the corpus, and they are the reason a score is what it is. */
+    var cues = document.createElement("div");
+    cues.className = "mx-cues";
+    [["Learned cues for bias", MODEL.topFeatures.positive, "pos"],
+     ["Learned cues for clear thinking", MODEL.topFeatures.negative, "neg"]
+    ].forEach(function (g) {
+      var col = document.createElement("div");
+      col.className = "mx-cue-col " + g[2];
+      var h = document.createElement("h3");
+      h.textContent = g[0];
+      col.appendChild(h);
+      var ul = document.createElement("ul");
+      g[1].forEach(function (f) {
+        var li = document.createElement("li");
+        li.innerHTML = '<span class="mx-term"></span><span class="mx-w">' +
+          (f[1] >= 0 ? "+" : "") + f[1].toFixed(2) + "</span>";
+        li.querySelector(".mx-term").textContent = f[0];
+        li.title = "Learned weight " + f[1].toFixed(3) + " — fitted from the corpus, not hand-written";
+        ul.appendChild(li);
+      });
+      col.appendChild(ul);
+      cues.appendChild(col);
+    });
+    wrap.appendChild(cues);
+    return wrap;
+  }
+
   function renderOverview() {
     catTitle.textContent = "The full picture";
     catMeta.textContent =
-      "Each badge is that bias's example-quality score · " +
-      "click any bias to jump to it";
+      "Every number is the model's reliability · click any bias to jump to it";
     if (legend) legend.style.display = "none";
     grid.className = "overview";
     grid.innerHTML = "";
 
-    var oq = overallQuality();
+    var oq = modelQuality();
     var head = document.createElement("div");
     head.className = "ov-head";
     var big = document.createElement("div");
     big.className = "ov-quality";
     var num = document.createElement("span");
     num.className = "ov-q-num";
-    num.textContent = oq == null ? "—" : oq.toFixed(1);
+    num.textContent = oq == null ? (trainState === "training" ? "…" : "—")
+                                 : oq.toFixed(1);
     if (oq != null) num.style.color = colorFor(oq / 100);
-    big.innerHTML = '<span class="ov-q-label">Training-set quality</span>';
+    big.innerHTML = '<span class="ov-q-label">Model quality</span>';
     big.appendChild(num);
+    var sub = document.createElement("span");
+    sub.className = "ov-q-sub";
+    sub.textContent = "cross-validated balanced accuracy";
+    big.appendChild(sub);
     head.appendChild(big);
     head.appendChild(buildSparkline(state.quality));
     grid.appendChild(head);
 
+    grid.appendChild(buildModelPanel());
+
     var note = document.createElement("p");
     note.className = "ov-note";
     note.textContent =
-      "The number on each bias is its example-quality score (0–100) = " +
-      "(avg of examples + inverse of avg counter-examples) / 2. " +
-      "Darker = higher quality. The training-set quality above is the average across all biases.";
+      "The number on each bias is the model's mean reliability across its " +
+      "examples — how confidently a model trained without them puts each one " +
+      "on its own side. Darker = the model reads that bias reliably. Pale rows " +
+      "are where it struggles: ambiguous wording, too few examples, or an " +
+      "example on the wrong side.";
     grid.appendChild(note);
 
     QUADRANTS.forEach(function (quad) {
@@ -922,7 +1142,7 @@
         var rows = document.createElement("div");
         rows.className = "ov-rows";
         cat.biases.forEach(function (b) {
-          var a = avgBias(b);
+          var a = avgReliability(b);
           var row = document.createElement("button");
           row.type = "button";
           row.className = "ov-row";
@@ -938,8 +1158,8 @@
           nm.className = "ov-name";
           nm.textContent = b.name;
 
-          var nPos = keptScores(b.positive).length;
-          var nNeg = keptScores(b.negative).length;
+          var nPos = keptReliability(b.positive).length;
+          var nNeg = keptReliability(b.negative).length;
           var dropped = (b.positive || []).length - nPos +
                         ((b.negative || []).length - nNeg);
           var meta = document.createElement("span");
@@ -949,9 +1169,10 @@
 
           var rnum = document.createElement("span");
           rnum.className = "ov-num";
-          rnum.textContent = a == null ? "—" : Math.round(a);
-          rnum.title = a == null ? "No scorable examples"
-            : "Example-quality score " + a.toFixed(1) + " / 100";
+          rnum.textContent = a == null ? (trainState === "training" ? "…" : "—")
+                                       : Math.round(a);
+          rnum.title = a == null ? "Nothing in the training set for this bias"
+            : "Model reliability " + a.toFixed(1) + "% across this bias's examples";
 
           row.appendChild(nm);
           row.appendChild(meta);
@@ -985,17 +1206,23 @@
      ============================================================ */
   function updateQualityBadge() {
     if (!qualityBadge) return;
-    var v = overallQuality();
+    var v = modelQuality();
     var h = state.quality;
     var delta = h.length >= 2 ? h[h.length - 1].value - h[h.length - 2].value : 0;
     qualityBadge.innerHTML = "";
+    qualityBadge.classList.toggle("training", trainState === "training");
     var lab = document.createElement("span");
     lab.className = "q-lab";
-    lab.textContent = "Quality";
+    lab.textContent = trainState === "training" ? "Training…" : "Model quality";
     var num = document.createElement("span");
     num.className = "q-num";
-    num.textContent = v == null ? "—" : v.toFixed(1);
+    num.textContent = v == null ? (trainState === "training" ? "…" : "—")
+                                : v.toFixed(1);
     if (v != null) num.style.color = colorFor(v / 100);
+    qualityBadge.title = v == null
+      ? "No trained model yet"
+      : "Cross-validated balanced accuracy of the model, fitted on " +
+        MODEL.metrics.docs + " examples. Click for detail.";
     qualityBadge.appendChild(lab);
     qualityBadge.appendChild(num);
     if (Math.abs(delta) >= 0.005) {
@@ -1014,16 +1241,26 @@
     qPop.className = "q-pop";
     qPop.addEventListener("click", function (e) { e.stopPropagation(); });
 
-    var v = overallQuality();
+    var v = modelQuality();
     var hd = document.createElement("div");
     hd.className = "q-pop-h";
-    hd.textContent = "Training-set quality";
+    hd.textContent = "Model quality";
     var bigN = document.createElement("div");
     bigN.className = "q-pop-big";
     bigN.textContent = v == null ? "—" : v.toFixed(1);
     if (v != null) bigN.style.color = colorFor(v / 100);
     qPop.appendChild(hd);
     qPop.appendChild(bigN);
+
+    var sum = document.createElement("div");
+    sum.className = "q-pop-sum";
+    sum.textContent = modelReady()
+      ? "Balanced accuracy, " + MODEL.metrics.folds + "-fold CV · AUC " +
+        (MODEL.metrics.auc == null ? "—" : MODEL.metrics.auc.toFixed(3)) +
+        " · F1 " + (MODEL.metrics.f1 * 100).toFixed(1) + "% · fitted on " +
+        MODEL.metrics.docs + " examples"
+      : (trainState === "training" ? "Refitting…" : "No trained model");
+    qPop.appendChild(sum);
     qPop.appendChild(buildSparkline(state.quality));
 
     var ul = document.createElement("ul");
@@ -1042,13 +1279,14 @@
     reset.className = "q-reset";
     reset.textContent = "Reset all marks & edits";
     reset.addEventListener("click", function () {
-      if (window.confirm("Clear all your marks, edits and history? This cannot be undone.")) {
+      if (window.confirm("Clear all your marks, edits and history and refit the " +
+                         "model on the original set? This cannot be undone.")) {
         state.items = {};
         state.quality = [];
         save();
-        recordQuality();
         closeQPop();
         render();
+        scheduleTrain();
       }
     });
     qPop.appendChild(reset);
@@ -1076,9 +1314,9 @@
   function render() {
     itemNodes = {};
     chipRefresh = {};
-    // The color-scheme legend describes bias %, which is meaningful on the
-    // example pages but misleading on the quality overview — show it by
-    // default; renderOverview() hides it.
+    // The colour legend explains the per-example reliability shading, which
+    // only appears on the example pages — show it by default; the overview
+    // hides it and explains its own numbers.
     if (legend) legend.style.display = "";
 
     var tabs = navbar.querySelectorAll(".tab");
@@ -1196,5 +1434,8 @@
   });
 
   buildNav();
+  // Queue the first fit before painting, so the first paint already shows the
+  // "training…" placeholders rather than a flash of empty scores.
+  scheduleTrain();
   render();
 })();
