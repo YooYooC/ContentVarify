@@ -117,8 +117,42 @@
     };
   }
 
+  /* ============================================================
+     Text quality checks — properties of the text itself, independent of
+     any model, so every scorer applies the same rule.
+
+     A sentence cut off mid-thought ("...play with my friends in the")
+     still contains plenty of recognisable words, so every similarity or
+     probability measure will happily score it. It should not be scored
+     at all: the missing half could change the meaning entirely.
+
+     Detection is the dangling-function-word test, chosen because it is
+     precise on this corpus — it flags 1 of 2,316 curated examples
+     (0.04%), and that one is itself truncated. Missing terminal
+     punctuation was rejected as a signal: it flags 18.6% of the corpus,
+     which are complete sentences whose final period was stripped.
+     ============================================================ */
+  var DANGLING = {};
+  ("the a an and or but of in on at to for with from by as that which who whose " +
+   "my his her their our its is was were are be been being i we they he she it " +
+   "this these those than then so if when while because about into over under " +
+   "after before near upon onto within between during although though whether"
+  ).split(" ").forEach(function (w) { DANGLING[w] = 1; });
+
+  function textIssues(text) {
+    var t = String(text || "").trim();
+    if (!t) return ["empty"];
+    var out = [];
+    if (/[,;:]$/.test(t)) out.push("truncated");            // trailing comma etc.
+    if (/[("'\[‘“]$/.test(t)) out.push("truncated"); // opened, never closed
+    var m = t.toLowerCase().match(/[a-z']+(?=[^a-z']*$)/);
+    if (m && DANGLING[m[0]]) out.push("truncated");
+    return out;
+  }
+
   window.CVEncoder = {
     tfidf: tfidfEncoder,
+    textIssues: textIssues,
     // Registry so the UI can name what produced a result, and so a future
     // encoder is added here rather than wired through the app.
     available: function () { return [{ id: "tfidf-uni+bi-v1", make: tfidfEncoder }]; }

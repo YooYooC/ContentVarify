@@ -33,21 +33,48 @@ html, body {
   border-bottom: 1px solid var(--line-soft);
 }
 .topbar-inner {
-  max-width: 1180px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 10px 22px;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
   flex-wrap: wrap;
 }
-.brand { display: flex; align-items: center; min-width: 150px; }
+.brand { display: flex; align-items: center; min-width: 0; flex: 0 0 auto; }
 .brand-title { font-size: 17px; font-weight: 700; }
 
-.navbar { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+/* Tabs sit in a fixed 3-column grid so they read as a block rather than
+   a ragged wrapping row. Rows fill top-to-bottom as tabs are added. */
+.navbar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 4px;
+  flex: 1 1 540px;
+  min-width: 0;
+  max-width: 596px;   /* keeps the whole header on one line at 1280px */
+}
+@media (max-width: 720px) {
+  .navbar { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: none; }
+}
+
+/* ---------- Test-text action (header, beside Export) ---------- */
+.test-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-left: auto;
+  border: 1px solid var(--line-soft); background: #fff; color: var(--ink);
+  border-radius: 999px; padding: 7px 15px;
+  font: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.test-btn:hover { background: #fafafb; box-shadow: var(--shadow); }
+.test-btn .test-ic { font-size: 14px; line-height: 1; }
+.test-btn.active {
+  border-color: var(--accent); background: #fbeef3; color: var(--accent);
+}
 
 /* ---------- Top-right export menu ---------- */
-.export-wrap { position: relative; margin-left: auto; }
+.export-wrap { position: relative; margin-left: 0; }
 .export-btn {
   display: inline-flex; align-items: center; gap: 6px;
   border: 1px solid var(--accent); background: var(--accent); color: #fff;
@@ -145,19 +172,29 @@ html, body {
 .spark-d.up { color: #047857; }
 .spark-d.down { color: #b91c1c; }
 
-.tab { position: relative; }
+.tab { position: relative; min-width: 0; }
+/* Each tab fills its grid cell, so the columns line up and long names
+   truncate instead of stretching the grid. */
 .tab-btn {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 6px;
   border: 0;
   background: transparent;
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   color: #3a3a40;
-  padding: 8px 12px;
+  padding: 7px 10px;
   border-radius: 8px;
   cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+}
+.tab-btn > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tab-btn:hover { background: #f2f2f4; }

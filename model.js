@@ -502,6 +502,17 @@
                     coverage: e.coverage, concentration: e.concentration }
       };
 
+      /* An unfinished sentence is not scoreable, however many familiar
+         words it contains — the missing half could reverse the meaning. */
+      var issues = window.CVEncoder && window.CVEncoder.textIssues
+        ? window.CVEncoder.textIssues(text) : [];
+      if (issues.indexOf("truncated") >= 0) {
+        out.status = "incomplete";
+        out.reason = "This looks like an unfinished sentence — it stops mid-thought. " +
+          "Complete it and the model will read it.";
+        return out;
+      }
+
       if (e.known === 0) {
         out.status = "insufficient";
         out.reason = e.terms

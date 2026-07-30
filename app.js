@@ -436,6 +436,14 @@
                         : "Type something for the model to read.";
       return;
     }
+    if (a.status === "incomplete") {
+      node.classList.add("reject");
+      node.innerHTML = '<b>Incomplete sentence</b>';
+      node.title = a.reason +
+        "\n\nNo percentage is shown: the missing part of the sentence could " +
+        "change the meaning entirely.";
+      return;
+    }
     if (a.status === "insufficient" || a.status === "unreliable") {
       node.classList.add("reject");
       node.innerHTML = '<b>' + (a.status === "insufficient"
@@ -1435,6 +1443,7 @@
       case "thin":       return { cls: "st-thin",   label: "Too few examples to be sure" };
       case "unreliable": return { cls: "st-no",     label: "Unable to classify reliably" };
       case "insufficient": return { cls: "st-no",   label: "Insufficient context" };
+      case "incomplete": return { cls: "st-no",     label: "Incomplete sentence" };
       default:           return { cls: "st-idle",   label: "" };
     }
   }
@@ -1834,6 +1843,8 @@
     Array.prototype.forEach.call(tabs, function (t, i) {
       t.classList.toggle("active", i === activeTab);
     });
+    var tb = document.getElementById("testBtn");
+    if (tb) tb.classList.toggle("active", !searching() && view.q === TEST_Q);
 
     if (searching()) { renderSearch(searchInput.value.trim()); updateQualityBadge(); return; }
     if (view.q === TEST_Q)     { renderTest();     updateQualityBadge(); return; }
@@ -1927,26 +1938,17 @@
     });
     otab.appendChild(obtn);
     navbar.appendChild(otab);
+    // Six tabs, three columns: the grid lands as exactly two rows.
+    // "Test text" is an action rather than a browsing destination, so it
+    // lives in the header beside Export (wired below).
+  }
 
-    // 7th tab — test a piece of text against the dataset
-    var ttab = document.createElement("div");
-    ttab.className = "tab test-tab";
-    var tbtn = document.createElement("button");
-    tbtn.className = "tab-btn";
-    tbtn.type = "button";
-    var tlabel = document.createElement("span");
-    tlabel.textContent = "⌕ Test text";
-    tbtn.appendChild(tlabel);
-    tbtn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      closeAllMenus();
-      if (searchInput) searchInput.value = "";
-      if (searchMeta) searchMeta.textContent = "";
-      view.q = TEST_Q;
-      render();
-    });
-    ttab.appendChild(tbtn);
-    navbar.appendChild(ttab);
+  function openTest() {
+    closeAllMenus();
+    if (searchInput) searchInput.value = "";
+    if (searchMeta) searchMeta.textContent = "";
+    view.q = TEST_Q;
+    render();
   }
 
   /* ============================================================
@@ -1957,6 +1959,11 @@
       if (!searchInput.value.trim() && searchMeta) searchMeta.textContent = "";
       render();
     });
+  }
+
+  var testBtn = document.getElementById("testBtn");
+  if (testBtn) {
+    testBtn.addEventListener("click", function (e) { e.stopPropagation(); openTest(); });
   }
 
   document.addEventListener("click", function () {

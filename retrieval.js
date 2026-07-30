@@ -366,6 +366,14 @@
         base.reason = "Nothing to analyse yet.";
         return base;
       }
+      var issues = window.CVEncoder && window.CVEncoder.textIssues
+        ? window.CVEncoder.textIssues(raw) : [];
+      if (issues.indexOf("truncated") >= 0) {
+        base.status = "incomplete";
+        base.reason = "This stops mid-thought — the rest of the sentence could " +
+          "change what it means, so it is not being matched against your dataset.";
+        return base;
+      }
       if (known < MIN_KNOWN) {
         base.status = "insufficient";
         base.reason = known === 0
