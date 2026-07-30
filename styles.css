@@ -524,6 +524,20 @@ a.cite:hover { opacity: .8; }
 .mx-w { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 720px) { .mx-cues { grid-template-columns: 1fr; } }
 
+/* ---------- Prediction readout in the edit / add forms ---------- */
+.ex-edit-auto .pred-dir {
+  font-weight: 500; color: var(--muted); font-size: 11.5px;
+}
+/* The model declining to score: never styled like a result. */
+.ex-edit-auto.reject {
+  color: #8a5a00;
+  background: #fff6e5;
+  border: 1px solid #f0dcb4;
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+.ex-edit-auto.reject b { font-weight: 700; }
+
 /* ---------- Quality badge: refit in progress ---------- */
 .quality-badge.training .q-lab { color: #b5174e; }
 .quality-badge.training .q-num { opacity: .55; }

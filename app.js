@@ -345,20 +345,65 @@
      Taken from the out-of-fold prediction wherever one exists, so an
      example is never graded by a model that memorised it.
      ------------------------------------------------------------ */
-  function probOf(item) {
-    if (!modelReady()) return null;
-    var p = MODEL.oof[item.__id];
-    if (p == null) p = MODEL.predict(effText(item));  // excluded / just added
-    return p;
-  }
   function reliabilityFromP(p, label) {
     return p == null ? null : 100 * (label === 1 ? p : 1 - p);
   }
-  function reliability(item) { return reliabilityFromP(probOf(item), item.__label); }
-  function reliabilityOfText(text, label) {
-    return modelReady() ? reliabilityFromP(MODEL.predict(text), label) : null;
+  /* Corpus example: its calibrated out-of-fold probability. An example not
+     currently in the training set (taken out, or added since the last fit)
+     has no held-out measurement, so it goes through the same gate as any
+     unseen text and may legitimately have no score at all. */
+  function reliability(item) {
+    if (!modelReady()) return null;
+    var p = MODEL.oof[item.__id];
+    if (p != null) return reliabilityFromP(p, item.__label);
+    var a = MODEL.assess(effText(item));
+    return reliabilityFromP(a.p, item.__label);
+  }
+  function assessText(text) {
+    return modelReady() && text ? MODEL.assess(text) : null;
   }
   function heldOut(item) { return modelReady() && MODEL.oof[item.__id] != null; }
+
+  /* ------------------------------------------------------------
+     Prediction confidence for UNSEEN text — a different quantity from
+     reliability, and deliberately rendered differently.
+
+     Reliability is a held-out measurement: the model was fitted without
+     that example and we recorded what it said. Text you type has no such
+     measurement, so what comes back is a prediction — calibrated against
+     the held-out data and capped by the model's measured accuracy at that
+     evidence level, and withheld entirely when there is too little to go
+     on. model.js returns confidence === null in that case, so there is no
+     number here to display by accident.
+     ------------------------------------------------------------ */
+  function renderPrediction(node, text) {
+    node.classList.remove("moved", "reject");
+    var a = assessText(text);
+    if (!a) {
+      node.innerHTML = 'Prediction confidence: <b>—</b>';
+      node.title = text ? "No trained model yet."
+                        : "Type something for the model to read.";
+      return;
+    }
+    if (a.status === "insufficient" || a.status === "unreliable") {
+      node.classList.add("reject");
+      node.innerHTML = '<b>' + (a.status === "insufficient"
+        ? "Insufficient context" : "Unable to classify reliably") + '</b>';
+      node.title = a.reason +
+        "\n\nNo percentage is shown because any number here would be guesswork.";
+      return;
+    }
+    if (a.status === "undecided") {
+      node.classList.add("reject");
+      node.innerHTML = '<b>Model is undecided</b>';
+      node.title = a.reason;
+      return;
+    }
+    node.innerHTML = 'Prediction confidence: <b>' +
+      Math.round(a.confidence * 100) + '%</b> <span class="pred-dir">' +
+      (a.label === 1 ? "example of the bias" : "clear thinking") + '</span>';
+    node.title = a.reason;
+  }
 
   /* Plain-language read of what the model made of an example. */
   function verdictOf(item) {
@@ -555,15 +600,17 @@
       ? (trainState === "training" ? "…" : "—")
       : Math.round(rel) + "%";
     badge.title = rel == null
-      ? "No model yet — nothing to report"
+      ? (trainState === "training" ? "Refitting the model…"
+         : modelReady()
+           ? "The model has too little to go on here to give a figure."
+           : "No model yet — nothing to report")
       : "Model reliability " + Math.round(rel) + "% — " + verdictOf(item) +
         " that this is " + (item.__label === 1 ? "an example of the bias" :
                             "clear thinking") + ".\n" +
-        (excluded
-          ? "Out of the training set, so this is a straight prediction."
-          : heldOut(item)
-            ? "Measured out-of-fold: predicted by a model trained without it."
-            : "Predicted by the current model.");
+        (heldOut(item)
+          ? "Measured out-of-fold — a model fitted without this example said so — " +
+            "then calibrated against the held-out data."
+          : "Not currently in the training set, so this is a prediction, not a measurement.");
 
     var hist = histOf(item);
     var histBtn = null;
@@ -622,18 +669,23 @@
     var wrap = document.createElement("div");
     wrap.className = "hist-panel";
 
-    // Every version is re-scored by the CURRENT model, so the trajectory
-    // is a like-for-like comparison of the wordings themselves.
+    // Superseded wordings are not in the training set, so these are
+    // predictions, not held-out measurements — and a wording the model
+    // can't judge shows "—" rather than a made-up number.
     var relOf = function (txt) {
-      var r = reliabilityOfText(txt, item.__label);
-      return r == null ? "—" : Math.round(r);
+      var a = assessText(txt);
+      if (!a || a.p == null) return "—";
+      return Math.round(reliabilityFromP(a.p, item.__label));
     };
-    var scores = hist.map(function (h) { return relOf(h.text); })
-                     .concat([relOf(effText(item))]);
+    var scores = hist.map(function (h) { return relOf(h.text); });
+    var cur = reliability(item);
+    scores.push(cur == null ? "—" : Math.round(cur));
     var traj = document.createElement("div");
     traj.className = "hist-traj";
-    traj.textContent = "Model reliability by version:  " + scores.join("  →  ");
-    traj.title = "Each wording scored by the model as it stands now";
+    traj.textContent = "Model prediction by version:  " + scores.join("  →  ");
+    traj.title = "Earlier wordings re-read by the model as it stands now. " +
+      "The last figure is the current example's held-out reliability. " +
+      "“—” means the model had too little to go on.";
     wrap.appendChild(traj);
 
     var list = document.createElement("ol");
@@ -674,24 +726,24 @@
     var row = document.createElement("div");
     row.className = "ex-edit-row";
 
-    /* Live reading from the trained model as you reformulate. It is a
-       prediction, not the saved figure: saving refits the model, and the
-       example's final score comes from the held-out fold. */
+    /* Unchanged text still has its held-out measurement, so it keeps the
+       "Model reliability" label. The moment you reword it, it becomes
+       unseen text and what the model offers is a prediction — named,
+       calibrated and gated accordingly. */
     var auto = document.createElement("span");
     auto.className = "ex-edit-auto";
     function refreshAuto() {
       var txt = ta.value.trim();
-      var changed = txt !== origText;
-      var s = changed ? reliabilityOfText(txt, item.__label) : baseRel;
-      auto.innerHTML = 'Model reliability: <b>' +
-        (s == null ? "—" : Math.round(s) + "%") + '</b>';
-      auto.classList.toggle("moved",
-        changed && s != null && baseRel != null && Math.round(s) !== Math.round(baseRel));
-      auto.title = changed
-        ? "The model's read on this wording" +
-          (baseRel == null ? "" : " (was " + Math.round(baseRel) + "%)") +
-          " — saving refits the model on it"
-        : "Unchanged — reword it and the model re-reads it live";
+      if (txt === origText) {
+        auto.classList.remove("moved", "reject");
+        auto.innerHTML = 'Model reliability: <b>' +
+          (baseRel == null ? "—" : Math.round(baseRel) + "%") + '</b>';
+        auto.title = "Held-out measurement for this example as it stands: the " +
+          "model was fitted without it and this is what it said. Reword it and " +
+          "the model gives a prediction instead.";
+        return;
+      }
+      renderPrediction(auto, txt);
     }
     refreshAuto();
     ta.addEventListener("input", refreshAuto);
@@ -760,24 +812,9 @@
       var row = document.createElement("div");
       row.className = "ex-edit-row";
 
-      var label = type === "positive" ? 1 : 0;
       var auto = document.createElement("span");
       auto.className = "ex-edit-auto";
-      function refreshAuto() {
-        var t = ta.value.trim();
-        var r = t ? reliabilityOfText(t, label) : null;
-        auto.innerHTML = 'Model reliability: <b>' +
-          (r == null ? "—" : Math.round(r) + "%") + '</b>';
-        auto.classList.toggle("moved", r != null && r < 50);
-        auto.title = r == null
-          ? "The model reads your text as you type"
-          : r < 50
-            ? "The model currently reads this as the OPPOSITE class — a " +
-              "surprising example, which is exactly what teaches it something new."
-            : "How confidently the model already classifies this as " +
-              (label ? "an example of the bias" : "clear thinking") +
-              ". Adding it refits the model.";
-      }
+      function refreshAuto() { renderPrediction(auto, ta.value.trim()); }
       refreshAuto();
       ta.addEventListener("input", refreshAuto);
 
@@ -1046,7 +1083,8 @@
       "Penalty for confident mistakes. Lower is better; 0.693 = no better than guessing."));
     tiles.appendChild(metricTile("Calibration error", (m.ece * 100).toFixed(1) + "%",
       "How far the model's stated confidence drifts from how often it is " +
-      "actually right. Lower means the % on each example can be taken at face value."));
+      "actually right. Lower means the % on each example can be taken at face " +
+      "value. Was " + (m.eceRaw * 100).toFixed(1) + "% before Platt calibration."));
     tiles.appendChild(metricTile("Training set", m.docs.toLocaleString(),
       m.pos.toLocaleString() + " examples of bias · " + m.neg.toLocaleString() +
       " counter-examples · " + m.features.toLocaleString() + " learned features"));
@@ -1057,10 +1095,32 @@
     how.textContent =
       "Logistic regression over word and two-word features (TF-IDF), " +
       "class-balanced, measured by " + m.folds + "-fold cross-validation: every " +
-      "example is scored by a model fitted without it. Quality above is " +
-      "balanced accuracy. Curating the set — ✕ to drop a weak example, " +
-      "rewording an unclear one, adding a new one — refits the model and moves these numbers.";
+      "example is scored by a model fitted without it. Those held-out " +
+      "predictions are then Platt-calibrated (A=" + m.platt.A.toFixed(2) +
+      "), which is what pulled calibration error from " +
+      (m.eceRaw * 100).toFixed(1) + "% down to " + (m.ece * 100).toFixed(1) +
+      "%. Quality above is balanced accuracy. Curating the set — ✕ to drop a " +
+      "weak example, rewording an unclear one, adding a new one — refits the " +
+      "model and moves these numbers.";
     wrap.appendChild(how);
+
+    /* Text you type has no held-out measurement behind it, so the app states
+       plainly what it will and won't claim about it. */
+    var gate = document.createElement("p");
+    gate.className = "ov-note";
+    var buckets = m.evidenceBuckets.filter(function (b) { return b.n >= 30; });
+    gate.textContent =
+      "For text you type in, the model reports a prediction rather than a " +
+      "reliability, and refuses outright when there is too little to go on — " +
+      "fewer than 5 recognised word patterns, or one word carrying over 60% " +
+      "of the decision. On this corpus that rule withholds a score from the " +
+      "12% of cases where the model is measurably overconfident. Predictions " +
+      "are also capped by measured accuracy at that evidence level: " +
+      buckets.map(function (b) {
+        return (b.upTo === null ? "8+" : "<" + b.upTo) + " content words → " +
+               (b.cap * 100).toFixed(0) + "%";
+      }).join(" · ") + ".";
+    wrap.appendChild(gate);
 
     /* What the model actually learned. Worth showing: these weights are
        fitted from the corpus, and they are the reason a score is what it is. */

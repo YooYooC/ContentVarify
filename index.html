@@ -8,7 +8,7 @@
        revalidate it; the assets below stay cacheable via their ?v= stamps. -->
   <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
   <title>Content Verify</title>
-  <link rel="stylesheet" href="styles.css?v=model1">
+  <link rel="stylesheet" href="styles.css?v=model2">
 </head>
 <body>
   <header class="topbar">
@@ -44,8 +44,10 @@
         <h2>Model reliability scale</h2>
         <p>Every % is the trained model's reliability on that example — how
            confidently a model fitted <em>without</em> it puts it back on its own
-           side. White = the model reads it as the opposite (0) · dark pink =
-           the model places it correctly and confidently (100).</p>
+           side, calibrated against the held-out results. White = the model reads
+           it as the opposite (0) · dark pink = the model places it correctly and
+           confidently (100). Text you type in gets a <em>prediction confidence</em>
+           instead, which the model withholds when there is too little context.</p>
       </div>
       <div>
         <div class="legend-gradient">
@@ -74,12 +76,12 @@
   <!-- 3. The bias dataset → window.BIAS_DATA -->
   <script src="data/biases.js"></script>
   <!-- 4. The model — trains in the browser, defines window.CVModel -->
-  <script src="model.js?v=model1"></script>
+  <script src="model.js?v=model2"></script>
   <!-- 5. The app (defines window.CVApp, renders the UI) -->
-  <script src="app.js?v=model1"></script>
+  <script src="app.js?v=model2"></script>
   <!-- 6. Export menu (CSV / Word / Google Sheets; uses CVApp.exportData) -->
-  <script src="export.js?v=model1"></script>
+  <script src="export.js?v=model2"></script>
   <!-- 7. Shared cross-device sync (uses CVApp + Supabase; no-op until configured) -->
-  <script src="supabase-sync.js?v=model1"></script>
+  <script src="supabase-sync.js?v=model2"></script>
 </body>
 </html>

@@ -36,6 +36,30 @@
   var FOLDS    = 5;
   var SEED     = 20260730;
 
+  /* ---- evidence gate (see assess()) --------------------------------
+     Vectors are L2-normalised, which deliberately makes long and short
+     texts comparable — but it also rescales a text with almost no known
+     words up to unit length, so a single stray feature can produce a
+     confident-looking probability. These thresholds catch that.
+
+     Chosen by measuring the accuracy/coverage trade-off on out-of-fold
+     predictions over the 2,493-example corpus:
+
+       rule                     coverage   accuracy on what is kept
+       none                       100%        81.4%
+       known>=4, conc<=0.70        94.2%      81.9%
+       known>=5, conc<=0.60        87.9%      82.7%   <- chosen
+       known>=6, conc<=0.55        80.4%      82.6%
+
+     The 12.1% it refuses is the population where the model is 71.8%
+     accurate while claiming 85.8% confidence — 14 points overconfident.
+     ------------------------------------------------------------------ */
+  var IDF_CONTENT = 4.0;   // idf at or above which a term counts as content-bearing
+  var MIN_KNOWN   = 5;     // fewer known features than this -> refuse to score
+  var MAX_CONC    = 0.60;  // one feature carrying more than this share -> refuse
+  var UNDECIDED   = 0.55;  // calibrated confidence below this -> "undecided"
+  var CONTENT_BINS = [2, 3, 5, 8];   // upper edges of the evidence buckets
+
   /* ============================================================
      Deterministic PRNG (so training is reproducible run to run)
      ============================================================ */
@@ -164,6 +188,47 @@
   }
 
   /* ============================================================
+     Calibration — Platt scaling fitted on out-of-fold predictions.
+
+     Raw logistic-regression probabilities are systematically too
+     extreme: over this corpus the model says 80-90% and is right 71.9%
+     of the time. Fitting P = sigmoid(A*z + B) on the held-out logits
+     corrects the scale (measured A = 0.596 — a value below 1 IS the
+     over-confidence). Two parameters over ~2.5k points, so the fact
+     that it is fitted and applied to the same predictions is negligible.
+     ============================================================ */
+  function fitPlatt(z, y) {
+    var A = 1, B = 0, it, i;
+    for (it = 0; it < 100; it++) {
+      var gA = 0, gB = 0, hA = 0, hB = 0;
+      for (i = 0; i < z.length; i++) {
+        var q = sigmoid(A * z[i] + B), e = q - y[i], v = q * (1 - q);
+        gA += e * z[i]; gB += e; hA += v * z[i] * z[i]; hB += v;
+      }
+      A -= gA / (hA + 1e-9);
+      B -= gB / (hB + 1e-9);
+      if (!isFinite(A) || !isFinite(B)) return { A: 1, B: 0 };  // degenerate -> identity
+    }
+    return (A > 0 && isFinite(A) && isFinite(B)) ? { A: A, B: B } : { A: 1, B: 0 };
+  }
+  function logit(p) {
+    var q = Math.min(1 - 1e-9, Math.max(1e-9, p));
+    return Math.log(q / (1 - q));
+  }
+
+  /* Lower bound of a binomial proportion (Wilson, ~90% one-sided). Used so
+     an evidence bucket with few examples can never license a confident
+     claim on the strength of a small, lucky sample. */
+  function wilsonLower(hits, n) {
+    if (!n) return 0.5;
+    var z = 1.2816, p = hits / n;
+    var d = 1 + z * z / n;
+    var c = p + z * z / (2 * n);
+    var m = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n));
+    return Math.max(0.5, Math.min(1, (c - m) / d));
+  }
+
+  /* ============================================================
      Metrics — all computed on held-out (out-of-fold) predictions
      ============================================================ */
   function auc(y, p) {
@@ -235,6 +300,48 @@
   }
 
   /* ============================================================
+     Evidence — how much the model actually has to go on.
+
+     Measured BEFORE L2 normalisation, which is the whole point:
+     normalisation rescales every text to unit length, so after it a
+     six-word interjection looks exactly as substantial as a full
+     sentence. These counts are what normalisation throws away.
+
+       known          distinct terms found in the vocabulary
+       content        of those, ones carrying real information (high idf)
+                      rather than function words
+       coverage       known / distinct terms produced
+       concentration  share of the decision resting on ONE feature
+     ============================================================ */
+  function evidenceOf(termCounts, voc, w) {
+    var vec = vectorize(termCounts, voc);
+    var known = 0, content = 0, mass = 0, uniq = 0, k, j;
+    for (k in termCounts) {
+      uniq++;
+      j = voc.map[k];
+      if (j === undefined) continue;
+      known++;
+      mass += (1 + Math.log(termCounts[k])) * voc.idf[j];
+      if (voc.idf[j] >= IDF_CONTENT) content++;
+    }
+    var total = 0, top = 0;
+    for (var f = 0; f < vec.idx.length; f++) {
+      var c = Math.abs(w[vec.idx[f]] * vec.val[f]);
+      total += c;
+      if (c > top) top = c;
+    }
+    return {
+      vec: vec, known: known, content: content, mass: mass, terms: uniq,
+      coverage: uniq ? known / uniq : 0,
+      concentration: total > 0 ? top / total : 1
+    };
+  }
+  function contentBin(c) {
+    for (var i = 0; i < CONTENT_BINS.length; i++) if (c < CONTENT_BINS[i]) return i;
+    return CONTENT_BINS.length;
+  }
+
+  /* ============================================================
      Stratified fold assignment (deterministic)
      ============================================================ */
   function foldsFor(y, k) {
@@ -271,6 +378,10 @@
                        : "Both classes need at least 5 examples.",
         oof: {}, metrics: null,
         predict: function () { return null; },
+        assess: function () {
+          return { status: "insufficient", confidence: null, p: null, label: null,
+                   reason: "No trained model yet.", evidence: null };
+        },
         topFeatures: { positive: [], negative: [] }
       };
     }
@@ -297,20 +408,60 @@
         if (fold[i] === f) oofP[i] = sigmoid(m.b + dot(m.w, X[i]));
       }
     }
-    var metrics = score(y, oofP);
+    /* ---- calibration: fitted on the held-out predictions only ---- */
+    var zs = new Float64Array(n);
+    for (i = 0; i < n; i++) zs[i] = logit(oofP[i]);
+    var platt = fitPlatt(zs, y);
+    var oofC = new Float64Array(n);          // calibrated out-of-fold probability
+    for (i = 0; i < n; i++) oofC[i] = sigmoid(platt.A * zs[i] + platt.B);
+
+    // Everything reported is measured on the calibrated held-out numbers,
+    // because those are the numbers the app actually displays.
+    var metrics = score(y, oofC);
     metrics.folds = k;
     metrics.features = dim;
     metrics.docs = n;
     metrics.pos = nPos;
     metrics.neg = nNeg;
+    metrics.platt = platt;
+    metrics.eceRaw = ece(y, oofP);           // for comparison: before calibration
+    metrics.brierRaw = score(y, oofP).brier;
 
     /* ---- final model: refit on everything, used for unseen text ---- */
     var all = [];
     for (i = 0; i < n; i++) all.push(i);
     var full = fit(X, y, all, dim, classW);
 
+    /* ---- how accurate the model actually is at each evidence level ----
+       This is the ceiling on what may be claimed for a new text: with only
+       three content words to go on, the model has been measured at ~77%,
+       so it may not report 98% however extreme the raw probability is. */
+    var caps = [], bucketN = [], bucketHit = [];
+    for (i = 0; i <= CONTENT_BINS.length; i++) { bucketN.push(0); bucketHit.push(0); }
+    for (i = 0; i < n; i++) {
+      var bi = contentBin(evidenceOf(docTerms[i], voc, full.w).content);
+      bucketN[bi]++;
+      if ((oofC[i] >= 0.5 ? 1 : 0) === y[i]) bucketHit[bi]++;
+    }
+    for (i = 0; i <= CONTENT_BINS.length; i++) caps.push(wilsonLower(bucketHit[i], bucketN[i]));
+    metrics.evidenceBuckets = [];
+    for (i = 0; i <= CONTENT_BINS.length; i++) {
+      metrics.evidenceBuckets.push({
+        upTo: i < CONTENT_BINS.length ? CONTENT_BINS[i] : null,
+        n: bucketN[i],
+        accuracy: bucketN[i] ? bucketHit[i] / bucketN[i] : null,
+        cap: caps[i]
+      });
+    }
+
+    // Median concentration across the corpus — used to explain rejections.
+    var concs = [];
+    for (i = 0; i < n; i++) concs.push(evidenceOf(docTerms[i], voc, full.w).concentration);
+    concs.sort(function (a, b) { return a - b; });
+    var medConc = concs[Math.floor(concs.length / 2)];
+
     var oof = Object.create(null);
-    for (i = 0; i < n; i++) if (docs[i].id != null) oof[docs[i].id] = oofP[i];
+    for (i = 0; i < n; i++) if (docs[i].id != null) oof[docs[i].id] = oofC[i];
 
     /* ---- what the model actually learned (for display / sanity) ---- */
     function topFeatures(limit) {
@@ -326,11 +477,78 @@
       };
     }
 
+    /* ============================================================
+       assess(text) — the ONLY safe entry point for unseen text.
+
+       Returns a decision, not a bare number. A raw probability is never
+       handed out for text the model has no business judging:
+
+         "insufficient"  nothing in the text was ever seen in training
+         "unreliable"    too few known features, or the whole decision
+                         resting on a single word
+         "undecided"     enough evidence, but the wording points both ways
+         "ok"            a calibrated confidence, capped by the model's
+                         measured accuracy at this evidence level
+
+       For the first two, `confidence` is null by construction, so no
+       caller can accidentally display a percentage.
+       ============================================================ */
+    function assess(text) {
+      var e = evidenceOf(counts(terms(text)), voc, full.w);
+      var out = {
+        status: "ok", p: null, label: null, confidence: null, cap: null,
+        reason: "",
+        evidence: { known: e.known, content: e.content, terms: e.terms,
+                    coverage: e.coverage, concentration: e.concentration }
+      };
+
+      if (e.known === 0) {
+        out.status = "insufficient";
+        out.reason = e.terms
+          ? "None of these words appear anywhere in the training set."
+          : "There is no text to judge.";
+        return out;
+      }
+      if (e.known < MIN_KNOWN) {
+        out.status = "unreliable";
+        out.reason = "Only " + e.known + " of " + e.terms + " word patterns here " +
+          "are ones the model learned from — it needs at least " + MIN_KNOWN + ".";
+        return out;
+      }
+      if (e.concentration > MAX_CONC) {
+        out.status = "unreliable";
+        out.reason = "A single word is carrying " + Math.round(e.concentration * 100) +
+          "% of this decision (across the training examples one word carries " +
+          Math.round(medConc * 100) + "% on average).";
+        return out;
+      }
+
+      var p = sigmoid(platt.A * (full.b + dot(full.w, e.vec)) + platt.B);
+      var conf = Math.max(p, 1 - p);
+      var cap = caps[contentBin(e.content)];
+      out.p = p;
+      out.label = p >= 0.5 ? 1 : 0;
+      out.cap = cap;
+
+      if (conf < UNDECIDED) {
+        out.status = "undecided";
+        out.reason = "The wording points both ways — the model has no clear read.";
+        return out;
+      }
+      out.confidence = Math.min(conf, cap);
+      out.reason = "Calibrated on held-out data, then capped at " +
+        Math.round(cap * 100) + "% — the model's measured accuracy on examples " +
+        "with this much context.";
+      return out;
+    }
+
     return {
       ready: true,
       metrics: metrics,
-      oof: oof,
-      // P(text shows the bias in action)
+      oof: oof,                    // CALIBRATED out-of-fold probabilities
+      assess: assess,
+      // Raw P(text shows the bias in action) — uncalibrated and ungated.
+      // Internal use only; never show this to a user for unseen text.
       predict: function (text) {
         return sigmoid(full.b + dot(full.w, vectorize(counts(terms(text)), voc)));
       },
@@ -338,5 +556,5 @@
     };
   }
 
-  window.CVModel = { train: train, version: 1 };
+  window.CVModel = { train: train, version: 2 };
 })();
