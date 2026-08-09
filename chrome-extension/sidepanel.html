@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Bias Lens</title>
+    <link rel="stylesheet" href="sidepanel.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand-mark" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="brand-copy">
+        <h1>Bias Lens</h1>
+        <p>On-device cognitive bias reader</p>
+      </div>
+      <button class="icon-button" id="aboutButton" type="button" aria-label="About this model" title="About this model">i</button>
+    </header>
+
+    <main>
+      <section class="source-card" aria-labelledby="sourceHeading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Reading assistant</p>
+            <h2 id="sourceHeading">What should I analyze?</h2>
+          </div>
+          <span class="private-pill"><span class="private-dot"></span>Private</span>
+        </div>
+
+        <div class="source-actions">
+          <button class="source-button primary" id="selectionButton" type="button">
+            <span class="source-icon selection-icon" aria-hidden="true"></span>
+            <span><strong>Selection</strong><small>Text highlighted on the page</small></span>
+          </button>
+          <button class="source-button" id="articleButton" type="button">
+            <span class="source-icon article-icon" aria-hidden="true"></span>
+            <span><strong>Article</strong><small>Main readable page content</small></span>
+          </button>
+        </div>
+
+        <label class="input-label" for="passageInput">
+          <span>Passage</span>
+          <span id="wordCount">0 words</span>
+        </label>
+        <textarea id="passageInput" rows="7" maxlength="30000" placeholder="Highlight a passage on the page, extract the article, or paste text here…"></textarea>
+
+        <div class="source-meta" id="sourceMeta" hidden>
+          <span id="sourceTitle"></span>
+          <a id="sourceLink" target="_blank" rel="noreferrer">Open page</a>
+        </div>
+
+        <div class="action-row">
+          <button class="text-button" id="clearButton" type="button">Clear</button>
+          <button class="analyze-button" id="analyzeButton" type="button" disabled>
+            <span class="button-spark" aria-hidden="true">✦</span>
+            <span>Analyze text</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="model-state" id="modelState" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <div><strong>Preparing the on-device model</strong><small>Indexing the cognitive-bias library…</small></div>
+      </section>
+
+      <section class="results" id="resultsSection" hidden aria-labelledby="resultsHeading">
+        <div class="results-header">
+          <div>
+            <p class="eyebrow">Analysis</p>
+            <h2 id="resultsHeading">Possible bias patterns</h2>
+          </div>
+          <span class="result-count" id="resultCount"></span>
+        </div>
+        <div class="summary" id="summary"></div>
+        <div class="result-list" id="resultList"></div>
+      </section>
+
+      <section class="empty-state" id="emptyState">
+        <div class="empty-illustration" aria-hidden="true">
+          <div class="orbit orbit-one"></div>
+          <div class="orbit orbit-two"></div>
+          <div class="center-dot"></div>
+        </div>
+        <h2>Read with a second look</h2>
+        <p>Analyze claims, arguments, and quotes for language that resembles known cognitive-bias examples.</p>
+        <ul>
+          <li>Results are clues, not facts about the author.</li>
+          <li>Every match links back to examples in the local dataset.</li>
+          <li>Nothing you read is uploaded.</li>
+        </ul>
+      </section>
+    </main>
+
+    <dialog id="aboutDialog">
+      <form method="dialog">
+        <button class="dialog-close" aria-label="Close">×</button>
+        <p class="eyebrow">How it works</p>
+        <h2>An evidence-based reading aid</h2>
+        <p>Bias Lens turns sentences into TF-IDF word and phrase vectors, retrieves similar labeled examples, and checks whether the language resembles bias or clear thinking.</p>
+        <div class="model-facts">
+          <div><strong id="factBiases">—</strong><span>biases</span></div>
+          <div><strong id="factExamples">—</strong><span>examples</span></div>
+          <div><strong id="factAccuracy">—</strong><span>binary accuracy</span></div>
+        </div>
+        <p class="fine-print">Similarity is not proof of intent, truth, or misinformation. Use the surrounding evidence and original sources before drawing a conclusion.</p>
+        <button class="dialog-action">Got it</button>
+      </form>
+    </dialog>
+
+    <script src="../data/biases.js"></script>
+    <script src="../encoder.js"></script>
+    <script src="../retrieval.js"></script>
+    <script src="../model.js"></script>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

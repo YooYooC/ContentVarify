@@ -20,8 +20,12 @@
 
    Everything is deterministic — a seeded shuffle, zero-initialised
    weights — so the same corpus always yields the same model and the
-   same numbers. Retraining is cheap enough (~2.5k docs) to re-run every
-   time the user curates the set.
+   same numbers. Retraining is cheap enough (~7.7k docs, ~1.5s) to re-run
+   every time the user curates the set.
+
+   Numbers quoted in the comments below were measured on the current
+   corpus by scripts/eval_model.js. Re-run it after changing the data;
+   they are claims about this corpus, not constants.
 
    Exposes: window.CVModel.train(docs) -> trained model (see bottom).
    ============================================================ */
@@ -30,7 +34,15 @@
 
   /* ---- hyper-parameters (fixed; not fitted to the test folds) ---- */
   var MIN_DF   = 2;      // a term must appear in >= 2 documents to be kept
-  var EPOCHS   = 45;
+  /* 45 passes suited the 2.5k-example corpus this began with. At 7.7k
+     examples the extra passes overfit: averaged over five different
+     cross-validation splits, held-out accuracy falls from 85.3% at 5
+     epochs to 84.7% at 45, and 5 beats 45 on every one of those splits
+     individually. Five sits mid-plateau (3-6 are indistinguishable at
+     85.2-85.4%) and refits in ~1.6s instead of ~14.5s, which the user
+     feels directly — the app refits on every curation click.
+     Re-check with scripts/tune_epochs.js if the corpus size changes. */
+  var EPOCHS   = 5;
   var LR       = 0.5;    // AdaGrad base step
   var LAMBDA   = 1e-5;   // L2 penalty, applied to touched features
   var FOLDS    = 5;
@@ -43,16 +55,27 @@
      confident-looking probability. These thresholds catch that.
 
      Chosen by measuring the accuracy/coverage trade-off on out-of-fold
-     predictions over the 2,493-example corpus:
+     predictions over the 7,655-example corpus:
 
        rule                     coverage   accuracy on what is kept
-       none                       100%        81.4%
-       known>=4, conc<=0.70        94.2%      81.9%
-       known>=5, conc<=0.60        87.9%      82.7%   <- chosen
-       known>=6, conc<=0.55        80.4%      82.6%
+       none                       100%        85.5%
+       known>=4, conc<=0.70        97.2%      85.7%
+       known>=5, conc<=0.60        94.3%      85.8%   <- chosen
+       known>=6, conc<=0.55        90.9%      86.0%
 
-     The 12.1% it refuses is the population where the model is 71.8%
-     accurate while claiming 85.8% confidence — 14 points overconfident.
+     Tightening further keeps buying a little accuracy, but each step
+     costs several times more coverage than it returns, so the knee is
+     taken rather than the maximum.
+
+     What the chosen rule refuses is 5.7% of the corpus, and the model is
+     80.5% accurate there against 85.5% overall — five points worse, on
+     the slice where it has least to go on. On the curated corpus that
+     slice is only mildly overconfident (claiming 81.7%), because every
+     example in it is still a well-formed sentence. The gate earns its
+     keep on what users actually paste: a fragment with two recognised
+     words is normalised to unit length like everything else, and without
+     this check would come back with a confident-looking percentage
+     resting on almost nothing.
      ------------------------------------------------------------------ */
   var IDF_CONTENT = 4.0;   // idf at or above which a term counts as content-bearing
   var MIN_KNOWN   = 5;     // fewer known features than this -> refuse to score
@@ -190,12 +213,24 @@
   /* ============================================================
      Calibration — Platt scaling fitted on out-of-fold predictions.
 
-     Raw logistic-regression probabilities are systematically too
-     extreme: over this corpus the model says 80-90% and is right 71.9%
-     of the time. Fitting P = sigmoid(A*z + B) on the held-out logits
-     corrects the scale (measured A = 0.596 — a value below 1 IS the
-     over-confidence). Two parameters over ~2.5k points, so the fact
-     that it is fitted and applied to the same predictions is negligible.
+     Fitting P = sigmoid(A*z + B) on the held-out logits rescales the raw
+     probabilities so a stated confidence means what it says. It cuts
+     expected calibration error from 2.2% to 0.8% on this corpus.
+
+     The direction is worth knowing, because it reversed. When this ran
+     for 45 epochs the weights grew large, probabilities were pushed to
+     the extremes, and A came out at 0.596 — below 1, which is what
+     over-confidence looks like: the model claimed 80-90% and was right
+     71.9% of the time. At 5 epochs the weights stay smaller, the raw
+     probabilities are no longer extreme, and A is now 1.140 — above 1,
+     meaning the model is mildly UNDER-confident and calibration stretches
+     its probabilities outward rather than reining them in. (Raw scores in
+     the 80-90% band are now right 87.1% of the time.)
+
+     So do not read A < 1 into this code as a standing fact about the
+     model; it is a measurement, and it moves with the corpus and the
+     hyper-parameters. Two parameters over ~7.7k points, so fitting and
+     applying them to the same predictions is negligible.
      ============================================================ */
   function fitPlatt(z, y) {
     var A = 1, B = 0, it, i;
@@ -502,17 +537,6 @@
                     coverage: e.coverage, concentration: e.concentration }
       };
 
-      /* An unfinished sentence is not scoreable, however many familiar
-         words it contains — the missing half could reverse the meaning. */
-      var issues = window.CVEncoder && window.CVEncoder.textIssues
-        ? window.CVEncoder.textIssues(text) : [];
-      if (issues.indexOf("truncated") >= 0) {
-        out.status = "incomplete";
-        out.reason = "This looks like an unfinished sentence — it stops mid-thought. " +
-          "Complete it and the model will read it.";
-        return out;
-      }
-
       if (e.known === 0) {
         out.status = "insufficient";
         out.reason = e.terms
@@ -567,5 +591,5 @@
     };
   }
 
-  window.CVModel = { train: train, version: 2 };
+  window.CVModel = { train: train, version: 3 };
 })();

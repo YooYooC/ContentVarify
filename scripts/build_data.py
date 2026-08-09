@@ -22,13 +22,62 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
 
 # Tab order matches the product's top nav.
+#
+# `cols` pins the column each field lives in, because the sheets do not agree
+# and have been re-ordered before. Not Enough Meaning gained a "Short"
+# definition column between the definition and the examples; Need to Act Fast
+# moved its Ex1-Ex5 / C-Ex1-C-Ex3 block right by three to make room for two
+# columns of bundled examples. Naming the indices here means a future
+# re-order is a one-line change instead of a silent mislabelling.
 SOURCES = [
-    {"file": "not-enough-meaning.csv",      "quadrant": "Not Enough Meaning",      "format": "two_col"},
-    {"file": "too-much-information.csv",     "quadrant": "Too Much Information",     "format": "two_col"},
-    {"file": "what-to-remember.csv",         "quadrant": "What to Remember",         "format": "two_col"},
-    {"file": "need-to-act-fast.csv",         "quadrant": "Need to Act Fast",         "format": "wide"},
-    {"file": "need-to-act-fast-parsed.csv",  "quadrant": "Need to Act Fast Parsed",  "format": "parsed"},
+    {"file": "not-enough-meaning.csv",      "quadrant": "Not Enough Meaning",      "format": "two_col",
+     "cols": {"cat": 0, "name": 1, "def": 2, "short": 3, "pos": 4, "neg": 5}},
+    {"file": "too-much-information.csv",     "quadrant": "Too Much Information",     "format": "two_col",
+     "cols": {"cat": 0, "name": 1, "def": 2, "pos": 3, "neg": 4}},
+    {"file": "what-to-remember.csv",         "quadrant": "What to Remember",         "format": "two_col",
+     "cols": {"cat": 0, "name": 1, "def": 2, "pos": 3, "neg": 4}},
+    {"file": "need-to-act-fast.csv",         "quadrant": "Need to Act Fast",         "format": "wide",
+     "cols": {"cat": 0, "name": 1, "def": 2, "packed_pos": 4, "packed_neg": 5,
+              "pos": [6, 7, 8, 9, 10], "neg": [11, 12, 13]}},
+    {"file": "need-to-act-fast-parsed.csv",  "quadrant": "Need to Act Fast Parsed",  "format": "parsed",
+     "cols": {"name": 0, "def": 1, "pos": 2, "neg": 3}},
 ]
+
+# Rows in need-to-act-fast.csv whose two bundled example columns are the wrong
+# way round: the first column holds the clear-thinking examples and the second
+# holds the bias in action, the opposite of every other row. Verified by
+# reading all 51 rows. Feeding these in unswapped would train the model on
+# inverted labels for these biases, so they are corrected on the way in.
+SWAPPED_PACKED = {
+    "actor-observer bias",
+    "pseudo certainty effect",
+    "disposition effect",
+}
+
+# Two rows in the sheets have one example column pasted over the top of the
+# other, so the same sentence ends up labelled both "bias in action" and
+# "clear thinking". Identical text under opposite labels is worse than no
+# example: it teaches nothing and guarantees an error in cross-validation
+# whatever the model learns. Each was read to establish which column received
+# the stray paste; the value is the side the duplicates are removed from.
+#
+#   Mood-congruent memory bias  the counter-example cell holds 5 genuine
+#                               counter-examples followed by a verbatim copy
+#                               of all 20 examples -> drop from negative
+#   Absent-mindedness           both cells hold the same text, and its content
+#                               ("Intentional focus during task aids memory")
+#                               is clear thinking -> drop from positive
+#   Levels of processing effect both cells hold the same text bar one typo
+#                               ("Amnesic"/"Amnesia"), and its content
+#                               ("Implicit test: shallow equals deep") argues
+#                               against the effect -> drop from positive. The
+#                               citations on the row below supply the real
+#                               positive examples.
+DUPLICATE_PASTE = {
+    "mood-congruent memory bias": "negative",
+    "absent-mindedness": "positive",
+    "levels of processing effect": "positive",
+}
 
 # ---------------------------------------------------------------------------
 # Text cleanup
@@ -54,8 +103,11 @@ def clean(s):
     return s
 
 
-# Strip leading list markers ("1) ", "1. ", "I. ", "* ") without touching wording.
-ENUM_RE = re.compile(r"^\s*(\d+[.)]|[IVX]+\.|\*)\s+")
+# Strip leading list markers ("1) ", "1. ", "I. ", "* ") without touching
+# wording. The optional single letter absorbs typos in the sheet such as
+# "d5. You update when evidence contradicts you." — it can only ever match one
+# stray character directly in front of a number, so real prose is untouched.
+ENUM_RE = re.compile(r"^\s*[A-Za-z]?(\d+[.)]|[IVX]+\.|\*)\s+")
 
 
 def strip_enum(line):
@@ -63,6 +115,7 @@ def strip_enum(line):
 
 
 URL_RE = re.compile(r"(https?://\S+)\s*$")
+HAS_WORD = re.compile(r"[A-Za-z]{2}")
 
 def make_item(text, kind):
     line = strip_enum(clean(text).strip())
@@ -71,17 +124,53 @@ def make_item(text, kind):
     if m:
         url = m.group(1)
         line = line[:m.start()].strip()
-    if not line:
+    # Leftover punctuation from a split ("." , ";") is not an example.
+    if not line or not HAS_WORD.search(line):
         return None
     return {"text": line, "url": url}
 
 
+# Some cells hold several examples run together on one line instead of one per
+# line. Two enumeration styles occur:
+#
+#   roman   "I. Baumeister et al. (2001): ... domain. II. Feedback ratio: ..."
+#           (the research-citation rows in what-to-remember.csv)
+#   packed  "1. Drivers text more; 2. Workers in protective gear take ..."
+#           (the bundled example columns in need-to-act-fast.csv)
+#
+# Splitting on the marker rather than on the separator matters: packed items
+# contain their own semicolons ("1. You succeeded because of your skill;
+# failed because the test was unfair; 2. You won ..."), so splitting on ";"
+# would shred them mid-example.
+# Split before a marker only when a capital letter or quote follows it, so a
+# number inside a sentence ("takes 3. of the sample") can't trigger a split.
+INLINE_SPLIT = re.compile(
+    r"\s+(?=(?:\d{1,2}|I{1,3}|IV|VI{0,3}|IX|XI{0,3}|V|X)\.\s+[A-Z\"'“‘])")
+PACKED_SPLIT = re.compile(r"(?:^|;)\s*\d{1,2}\.\s+")
+
+
 def split_multiline(cell, kind):
+    """One example per line, further splitting any line that runs several
+    numbered or roman-numbered examples together."""
     items = []
     for raw in clean(cell).split("\n"):
         if not raw.strip():
             continue
-        item = make_item(raw, kind)
+        for part in INLINE_SPLIT.split(raw):
+            item = make_item(part, kind)
+            if item:
+                items.append(item)
+    return items
+
+
+def split_packed(cell, kind):
+    """A single cell holding "1. ... ; 2. ... ; 3. ..." -> one item each."""
+    items = []
+    for part in PACKED_SPLIT.split(clean(cell)):
+        part = part.strip().rstrip(";").strip()
+        if not part:
+            continue
+        item = make_item(part, kind)
         if item:
             items.append(item)
     return items
@@ -99,87 +188,122 @@ def title_aliases(quadrant):
     return {q, re.sub(r"\s*parsed$", "", q)}
 
 
-def parse_two_col(rows, quadrant):
-    """col0=category, col1=bias name, col2=def, col3=positive, col4=negative."""
-    cats, cur, titles = [], None, title_aliases(quadrant)
+def cell(row, i):
+    return row[i] if i is not None and i < len(row) else ""
+
+
+def is_header(row, cols):
+    """The label row ("Definition" / "Positive Examples" / "Ex1" ...)."""
+    d = cell(row, cols.get("def")).strip().lower()
+    if d in ("definition", "long definition"):
+        return True
+    pos = cols.get("pos")
+    first = pos[0] if isinstance(pos, list) else pos
+    return cell(row, first).strip().lower() in ("ex1", "example", "positive examples")
+
+
+def parse_two_col(rows, quadrant, cols):
+    """One bias per row. A row with no category and no name is a continuation
+    of the bias above — what-to-remember.csv puts each bias's research
+    citations on such a row, and dropping them lost 18 rows of examples."""
+    cats, cur, last, titles = [], None, None, title_aliases(quadrant)
     for row in rows:
-        row = (row + [""] * 5)[:5]
-        c0, c1, c2, c3, c4 = row
         if is_blank(row):
             continue
-        if c2.strip().lower() in ("definition",):       # header row
+        c_cat  = cell(row, cols["cat"]).strip()
+        c_name = cell(row, cols["name"]).strip()
+        if is_header(row, cols):
             continue
-        if c0.strip() and c0.strip().lower() in titles:  # quadrant title
+        if c_cat and c_cat.lower() in titles:            # quadrant title
             continue
-        if c1.strip():                                   # bias
+        if c_name:                                       # bias
             if cur is None:
                 cur = {"name": quadrant, "biases": []}
                 cats.append(cur)
+            last = {
+                "name": clean(c_name),
+                "definition": clean(cell(row, cols["def"])).strip(),
+                "positive": split_multiline(cell(row, cols["pos"]), "positive"),
+                "negative": split_multiline(cell(row, cols["neg"]), "negative"),
+            }
+            short = clean(cell(row, cols["short"])).strip() if "short" in cols else ""
+            if short:
+                last["short"] = short
+            cur["biases"].append(last)
+        elif c_cat:                                      # category header
+            cur = {"name": clean(c_cat), "biases": []}
+            cats.append(cur)
+        elif last is not None:                           # continuation row
+            last["positive"] += split_multiline(cell(row, cols["pos"]), "positive")
+            last["negative"] += split_multiline(cell(row, cols["neg"]), "negative")
+    return cats
+
+
+def parse_wide(rows, quadrant, cols):
+    """One example per cell across Ex1-Ex5 / C-Ex1-C-Ex3, plus two columns
+    holding a further ~10 examples per side bundled into one cell."""
+    cats, cur, titles = [], None, title_aliases(quadrant)
+    for row in rows:
+        if is_blank(row):
+            continue
+        if is_header(row, cols):
+            continue
+        c_cat  = cell(row, cols["cat"]).strip()
+        c_name = cell(row, cols["name"]).strip()
+        if c_cat and c_cat.lower() in titles:
+            continue
+        if c_name:                                       # bias
+            if cur is None:
+                cur = {"name": quadrant, "biases": []}
+                cats.append(cur)
+            pos = [make_item(cell(row, i), "positive") for i in cols["pos"] if cell(row, i).strip()]
+            neg = [make_item(cell(row, i), "negative") for i in cols["neg"] if cell(row, i).strip()]
+            pos = [p for p in pos if p]
+            neg = [n for n in neg if n]
+
+            packed_pos = cell(row, cols["packed_pos"])
+            packed_neg = cell(row, cols["packed_neg"])
+            if c_name.lower() in SWAPPED_PACKED:         # this row is inverted
+                packed_pos, packed_neg = packed_neg, packed_pos
+            pos += split_packed(packed_pos, "positive")
+            neg += split_packed(packed_neg, "negative")
+
             cur["biases"].append({
-                "name": clean(c1).strip(),
-                "definition": clean(c2).strip(),
-                "positive": split_multiline(c3, "positive"),
-                "negative": split_multiline(c4, "negative"),
+                "name": clean(c_name),
+                "definition": clean(cell(row, cols["def"])).strip(),
+                "positive": pos,
+                "negative": neg,
             })
-        elif c0.strip():                                 # category header
-            cur = {"name": clean(c0).strip(), "biases": []}
+        elif c_cat:                                      # category header
+            cur = {"name": clean(c_cat), "biases": []}
             cats.append(cur)
     return cats
 
 
-def parse_wide(rows, quadrant):
-    """col0=category, col1=name, col2=def, col3-7=Ex, col8-10=C-Ex (one per cell)."""
-    cats, cur, titles = [], None, title_aliases(quadrant)
-    for row in rows:
-        row = (row + [""] * 11)[:11]
-        if is_blank(row):
-            continue
-        if row[2].strip().lower() == "definition":
-            continue
-        if row[0].strip() and row[0].strip().lower() in titles:
-            continue
-        if row[1].strip():                               # bias
-            if cur is None:
-                cur = {"name": quadrant, "biases": []}
-                cats.append(cur)
-            pos = [make_item(row[i], "positive") for i in (3, 4, 5, 6, 7) if row[i].strip()]
-            neg = [make_item(row[i], "negative") for i in (8, 9, 10) if row[i].strip()]
-            cur["biases"].append({
-                "name": clean(row[1]).strip(),
-                "definition": clean(row[2]).strip(),
-                "positive": [p for p in pos if p],
-                "negative": [n for n in neg if n],
-            })
-        elif row[0].strip():                             # category header
-            cur = {"name": clean(row[0]).strip(), "biases": []}
-            cats.append(cur)
-    return cats
-
-
-def parse_parsed(rows, quadrant):
+def parse_parsed(rows, quadrant, cols):
     """col0=name (or category), col1=def, col2=Ex, col3=C-Ex (multi-line)."""
     cats, cur, titles = [], None, title_aliases(quadrant)
     for row in rows:
-        row = (row + [""] * 4)[:4]
-        c0, c1, c2, c3 = row
         if is_blank(row):
             continue
-        if c1.strip().lower() == "definition":           # sub-header
+        c0 = cell(row, cols["name"]).strip()
+        c1 = cell(row, cols["def"]).strip()
+        if c1.lower() == "definition":                   # sub-header
             continue
-        if c0.strip() and c0.strip().lower() in titles:
+        if c0 and c0.lower() in titles:
             continue
-        if c0.strip() and c1.strip():                    # bias
+        if c0 and c1:                                    # bias
             if cur is None:
                 cur = {"name": quadrant, "biases": []}
                 cats.append(cur)
             cur["biases"].append({
-                "name": clean(c0).strip(),
-                "definition": clean(c1).strip(),
-                "positive": split_multiline(c2, "positive"),
-                "negative": split_multiline(c3, "negative"),
+                "name": clean(c0),
+                "definition": clean(c1),
+                "positive": split_multiline(cell(row, cols["pos"]), "positive"),
+                "negative": split_multiline(cell(row, cols["neg"]), "negative"),
             })
-        elif c0.strip():                                 # category header
-            cur = {"name": clean(c0).strip(), "biases": []}
+        elif c0:                                         # category header
+            cur = {"name": clean(c0), "biases": []}
             cats.append(cur)
     return cats
 
@@ -191,18 +315,46 @@ def slug(s):
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
+def dedupe_contradictions(quadrants):
+    """Remove any example that carries both labels within the same bias.
+
+    Where the affected bias is one of the two verified above, only the copy on
+    the pasted-over side goes and the good side is kept. Anything else is a
+    case nobody has looked at, so it is dropped from both sides and reported
+    rather than silently resolved in a guessed direction.
+    """
+    fixed, unverified = 0, []
+    for q in quadrants:
+        for c in q["categories"]:
+            for b in c["biases"]:
+                pos = {i["text"] for i in b["positive"]}
+                both = pos & {i["text"] for i in b["negative"]}
+                if not both:
+                    continue
+                side = DUPLICATE_PASTE.get(b["name"].strip().lower())
+                drop = [side] if side else ["positive", "negative"]
+                if not side:
+                    unverified.append((q["name"], b["name"], len(both)))
+                for s in drop:
+                    b[s] = [i for i in b[s] if i["text"] not in both]
+                fixed += len(both)
+    return fixed, unverified
+
+
 def main():
     quadrants = []
     for src in SOURCES:
         path = os.path.join(DATA, src["file"])
         with open(path, newline="", encoding="utf-8") as f:
             rows = list(csv.reader(f))
-        cats = PARSERS[src["format"]](rows, src["quadrant"])
+        cats = PARSERS[src["format"]](rows, src["quadrant"], src["cols"])
         quadrants.append({
             "name": src["quadrant"],
             "id": slug(src["quadrant"]),
             "categories": cats,
         })
+
+    fixed, unverified = dedupe_contradictions(quadrants)
 
     data = {"title": "Content Verify", "quadrants": quadrants}
 
@@ -213,10 +365,33 @@ def main():
         json.dump(data, f, ensure_ascii=False)
         f.write(";\n")
 
-    print("Quadrants:")
+    tb = tp = tn = 0
+    print(f"{'quadrant':<26}{'cats':>5}{'biases':>8}{'positive':>10}{'negative':>10}")
     for q in quadrants:
         nb = sum(len(c["biases"]) for c in q["categories"])
-        print(f"  {q['name']}: {len(q['categories'])} categories, {nb} biases")
+        np_ = sum(len(b["positive"]) for c in q["categories"] for b in c["biases"])
+        nn = sum(len(b["negative"]) for c in q["categories"] for b in c["biases"])
+        tb += nb; tp += np_; tn += nn
+        print(f"  {q['name']:<24}{len(q['categories']):>5}{nb:>8}{np_:>10}{nn:>10}")
+    print(f"  {'TOTAL':<24}{'':>5}{tb:>8}{tp:>10}{tn:>10}   ({tp + tn} training examples)")
+
+    if fixed:
+        print(f"\n  removed {fixed} example(s) that carried both labels "
+              f"(duplicated cell in the source sheet)")
+    for qn, bn, k in unverified:
+        print(f"    ! {qn} / {bn}: {k} contradictory example(s), side unverified "
+              f"-> dropped from both. Check the sheet.")
+
+    # A bias with nothing on one side teaches the model nothing about that
+    # side, and is nearly always a column that moved rather than a gap in the
+    # source, so it is worth surfacing every build.
+    empty = [(q["name"], b["name"])
+             for q in quadrants for c in q["categories"] for b in c["biases"]
+             if not b["positive"] or not b["negative"]]
+    if empty:
+        print(f"\n  {len(empty)} bias(es) missing examples on one side:")
+        for qn, bn in empty:
+            print(f"    - {qn}: {bn}")
 
 
 if __name__ == "__main__":

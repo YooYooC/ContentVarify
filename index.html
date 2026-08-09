@@ -76,19 +76,24 @@
   <script src="config.js"></script>
   <!-- 2. Supabase client library (skipped gracefully if offline) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Every local script carries the same ?v= tag; bump it whenever any of
+       them change, including the dataset. data/biases.js was previously the
+       one file without a tag, so browsers kept serving a cached copy of the
+       old dataset while every other file updated — the app looked stale for
+       no visible reason. -->
   <!-- 3. The bias dataset → window.BIAS_DATA -->
-  <script src="data/biases.js"></script>
+  <script src="data/biases.js?v=corpus7655"></script>
   <!-- 4. Encoder — text to vectors. Swap this to upgrade the representation. -->
-  <script src="encoder.js?v=retr6"></script>
+  <script src="encoder.js?v=corpus7655"></script>
   <!-- 5. Retrieval — which bias is this? Answers only from your dataset. -->
-  <script src="retrieval.js?v=retr6"></script>
+  <script src="retrieval.js?v=corpus7655"></script>
   <!-- 6. Baseline model — binary bias/clear-thinking, kept for comparison -->
-  <script src="model.js?v=retr6"></script>
+  <script src="model.js?v=corpus7655"></script>
   <!-- 5. The app (defines window.CVApp, renders the UI) -->
-  <script src="app.js?v=retr6"></script>
+  <script src="app.js?v=corpus7655"></script>
   <!-- 6. Export menu (CSV / Word / Google Sheets; uses CVApp.exportData) -->
-  <script src="export.js?v=retr6"></script>
+  <script src="export.js?v=corpus7655"></script>
   <!-- 7. Shared cross-device sync (uses CVApp + Supabase; no-op until configured) -->
-  <script src="supabase-sync.js?v=retr6"></script>
+  <script src="supabase-sync.js?v=corpus7655"></script>
 </body>
 </html>

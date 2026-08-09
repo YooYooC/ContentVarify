@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "Bias Lens — Cognitive Bias Reader",
+  "version": "1.1.0",
+  "description": "Highlights passages on the page that resemble known cognitive-bias patterns, and explains each one, using an on-device model.",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "scripting",
+    "sidePanel",
+    "storage"
+  ],
+  "action": {
+    "default_title": "Open Bias Lens",
+    "default_icon": {
+      "16": "chrome-extension/icons/icon16.png",
+      "32": "chrome-extension/icons/icon32.png",
+      "48": "chrome-extension/icons/icon48.png",
+      "128": "chrome-extension/icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "chrome-extension/icons/icon16.png",
+    "32": "chrome-extension/icons/icon32.png",
+    "48": "chrome-extension/icons/icon48.png",
+    "128": "chrome-extension/icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "chrome-extension/service-worker.js"
+  },
+  "side_panel": {
+    "default_path": "chrome-extension/sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["chrome-extension/content.js"],
+      "css": ["chrome-extension/content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+B",
+        "mac": "Alt+Shift+B"
+      },
+      "description": "Open Bias Lens"
+    },
+    "toggle-highlights": {
+      "suggested_key": {
+        "default": "Alt+Shift+H",
+        "mac": "Alt+Shift+H"
+      },
+      "description": "Highlight bias patterns on this page"
+    }
+  }
+}
