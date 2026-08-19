@@ -36,7 +36,38 @@
   "use strict";
 
   var K_NEIGHBOURS = 15;    // how many nearest examples inform an answer
-  var NEG_WEIGHT   = 0.7;   // a counter-example's vote against its own bias
+  /* Counter-examples do not vote here any more, and the reason is worth
+     stating because 0.7 looked reasonable and was quietly the single most
+     expensive number in the file.
+
+     The counter-examples in this corpus are minimal-pair rewrites of the
+     examples they sit beside — "A teenager starts listening to a music
+     artist ... all of her friends are talking about it" against "A teenager
+     who notices her friends all listening to a new artist ...". As prose
+     they are almost the same string, so the counter-example is retrieved
+     whenever its own example is. Measured: in 60.7% of queries the true
+     bias's own counter-example comes back alongside its example and votes
+     against it. The guard fired hardest exactly where it was least wanted.
+
+       NEG_WEIGHT   top-1   prose queries   clear thinking named as its bias
+          0.7       49.8%       58.4%                30.7%
+          0.35      56.9%       67.4%                40.7%
+          0         62.9%       74.7%                55.3%
+
+     Targeted variants were tried instead — vetoing only when a counter-
+     example is closer than every example (39.4%), soft-vetoing (55.0%),
+     damping by the positive's share of the evidence (52.0%) — and all were
+     worse than simply not voting.
+
+     That last column is the cost, and it is paid somewhere better. This
+     file answers "which bias is this text about", for which a counter-
+     example of anchoring is still anchoring material. Whether the bias is
+     actually present is a different question, and model.js already answers
+     it at 84% with AUC 0.92 — so the app shows that verdict beside these
+     candidates rather than smearing it through the similarity scores.
+     Counter-examples remain in the index as neighbours the user can read,
+     and remain the negative class model.js trains on. */
+  var NEG_WEIGHT   = 0;
   var MIN_KNOWN    = 3;     // fewer recognised terms than this -> insufficient
   /* SIM_FLOOR drops a neighbour from the ballot entirely. It was 0.12, which
      silently discarded 28% of all queries as "nothing close enough" — not
@@ -65,19 +96,22 @@
      measured against the 0.12 floor and, left in place after it moved, cut
      the share of queries answered from 36% to 13%.
 
-     Measured now (leave-one-out, held out, K=15, floor 0.06):
+     Measured now (leave-one-out, held out, K=15, floor 0.06, NEG_WEIGHT 0):
 
        confidence >=   share of queries   top-1 correct there
-            0.12             59.9%              67.3%
-            0.15             47.7%              73.7%   <- WEAK_CONF
-            0.20             32.5%              82.1%
-            0.25             22.6%              87.3%
-            0.30             15.6%              89.7%   <- OK_CONF
-            0.40              6.3%              95.5%
+            0.12             86.0%              69.8%
+            0.15             76.2%              73.8%   <- WEAK_CONF
+            0.20             62.4%              80.2%
+            0.25             51.0%              84.9%
+            0.30             41.4%              88.8%   <- OK_CONF
+            0.40             27.2%              92.9%
 
-     The pair below answers 47.7% of queries against the previous 35.6%, and
-     is right 73.7% of the time there against the previous 71.1% — more
-     coverage and better accuracy, which is what the floor fix bought. */
+     So "a likely candidate" is right about three times in four, and the
+     confident tier is right about nine times in ten. Read together with the
+     NEG_WEIGHT note above: dropping the counter-example vote moved top-1
+     from 49.7% to 62.9% and top-3 from 62.5% to 76.1%, and the share of
+     queries answered at all from 42.3% to 61.3% — without giving up
+     precision, which rose from 76.3% to 78.2%. */
   var OK_CONF      = 0.30;  // present as an answer
   var WEAK_CONF    = 0.15;  // present as a candidate worth looking at
   var MIN_SUPPORT  = 8;     // examples a bias needs before it can be asserted

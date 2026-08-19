@@ -1587,6 +1587,39 @@
     verdict.appendChild(ev);
     grid.appendChild(verdict);
 
+    /* ---- is the bias actually present? ----
+       The candidates below answer "which bias is this text about". They do
+       not answer "is the bias there", and the two come apart constantly: a
+       piece of clear thinking about anchoring is still about anchoring.
+       Retrieval used to try to carry both by letting counter-examples vote
+       against their own bias, which cost 13 points of accuracy because the
+       counter-examples are minimal-pair rewrites that fire alongside the
+       examples they contrast with (see retrieval.js). The judgement belongs
+       to the trained classifier, which is measured at it, so it is shown
+       here in its own right. */
+    var presence = assessText(testState.text);
+    if (presence) {
+      var pw = document.createElement("div");
+      pw.className = "test-presence";
+      var decided = presence.status === "ok" && presence.label != null;
+      var ph = document.createElement("span");
+      ph.className = "tp-head";
+      ph.textContent = decided
+        ? (presence.label === 1 ? "Reads as the bias in action" : "Reads as clear thinking")
+        : "Bias present? Not enough to say";
+      var pd = document.createElement("span");
+      pd.className = "tp-detail";
+      pd.textContent = decided
+        ? "the trained classifier, " + Math.round(presence.confidence * 100) +
+          "% confident · separate from which bias it resembles"
+        : "the classifier withheld a verdict · the matches below are still what it resembles";
+      pw.className += decided ? (presence.label === 1 ? " tp-yes" : " tp-no") : " tp-unsure";
+      pw.title = presence.reason || "";
+      pw.appendChild(ph);
+      pw.appendChild(pd);
+      grid.appendChild(pw);
+    }
+
     /* ---- candidates ---- */
     if (r.candidates && r.candidates.length) {
       var asserted = r.status === "ok" || r.status === "weak";

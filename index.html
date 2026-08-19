@@ -8,7 +8,7 @@
        revalidate it; the assets below stay cacheable via their ?v= stamps. -->
   <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
   <title>Content Verify</title>
-  <link rel="stylesheet" href="styles.css?v=retr6">
+  <link rel="stylesheet" href="styles.css?v=retr7">
 </head>
 <body>
   <header class="topbar">
@@ -82,18 +82,18 @@
        old dataset while every other file updated — the app looked stale for
        no visible reason. -->
   <!-- 3. The bias dataset → window.BIAS_DATA -->
-  <script src="data/biases.js?v=corpus7611"></script>
+  <script src="data/biases.js?v=presence1"></script>
   <!-- 4. Encoder — text to vectors. Swap this to upgrade the representation. -->
-  <script src="encoder.js?v=corpus7611"></script>
+  <script src="encoder.js?v=presence1"></script>
   <!-- 5. Retrieval — which bias is this? Answers only from your dataset. -->
-  <script src="retrieval.js?v=corpus7611"></script>
+  <script src="retrieval.js?v=presence1"></script>
   <!-- 6. Baseline model — binary bias/clear-thinking, kept for comparison -->
-  <script src="model.js?v=corpus7611"></script>
+  <script src="model.js?v=presence1"></script>
   <!-- 5. The app (defines window.CVApp, renders the UI) -->
-  <script src="app.js?v=corpus7611"></script>
+  <script src="app.js?v=presence1"></script>
   <!-- 6. Export menu (CSV / Word / Google Sheets; uses CVApp.exportData) -->
-  <script src="export.js?v=corpus7611"></script>
+  <script src="export.js?v=presence1"></script>
   <!-- 7. Shared cross-device sync (uses CVApp + Supabase; no-op until configured) -->
-  <script src="supabase-sync.js?v=corpus7611"></script>
+  <script src="supabase-sync.js?v=presence1"></script>
 </body>
 </html>

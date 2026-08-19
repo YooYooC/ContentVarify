@@ -605,6 +605,24 @@ a.cite:hover { opacity: .8; }
 .test-verdict.st-no   { background: #f4f4f6; border-color: #e0e0e6; }
 .test-verdict.st-no   .tv-head { color: #4a4a55; }
 
+/* Is the bias actually present — the trained classifier's own verdict,
+   deliberately a thin strip rather than a second panel: it answers a
+   different question from the candidates and should not compete with them
+   for the eye. */
+.test-presence {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  border-radius: var(--radius); padding: 8px 14px; margin-bottom: 12px;
+  border: 1px solid var(--line); background: var(--panel);
+}
+.tp-head { font-size: 13px; font-weight: 700; }
+.tp-detail { font-size: 11.5px; color: var(--muted); }
+.test-presence.tp-yes { background: #fdf6e7; border-color: #f0e0b8; }
+.test-presence.tp-yes .tp-head { color: #8a6a12; }
+.test-presence.tp-no  { background: #edf7ee; border-color: #cfe6d2; }
+.test-presence.tp-no  .tp-head { color: #2c6b38; }
+.test-presence.tp-unsure { background: #f4f4f6; border-color: #e0e0e6; }
+.test-presence.tp-unsure .tp-head { color: #4a4a55; }
+
 /* candidate cards */
 .cand {
   background: var(--panel); border: 1px solid var(--line);
