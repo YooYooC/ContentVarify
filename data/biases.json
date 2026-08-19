@@ -18200,6 +18200,82 @@
                 {
                   "text": "A news reader who dislikes a certain company clicks on every negative headline about it while skipping neutral coverage. (Survey on Echo Chambers on Social Media, 2021)",
                   "url": "https://arxiv.org/pdf/2112.05084"
+                },
+                {
+                  "text": "Decide it is overpriced, then read only the reviews that say so.",
+                  "url": ""
+                },
+                {
+                  "text": "Every review read after the verdict seems to confirm the verdict.",
+                  "url": ""
+                },
+                {
+                  "text": "Counting the complaints and scrolling past the praise.",
+                  "url": ""
+                },
+                {
+                  "text": "Having already concluded the laptop was overpriced, he read only the reviews complaining about the price and skipped the ones calling it good value.",
+                  "url": ""
+                },
+                {
+                  "text": "A shopper who had decided a brand was poor quality read every one-star review closely and scrolled past the four- and five-star ones.",
+                  "url": ""
+                },
+                {
+                  "text": "Once she was convinced the restaurant was overrated, every review she read seemed to confirm it, though she never opened the favourable ones.",
+                  "url": ""
+                },
+                {
+                  "text": "A buyer who already believed the car was a bad deal counted each negative comment as proof and dismissed the positive ones as paid promotion.",
+                  "url": ""
+                },
+                {
+                  "text": "Having decided the software was unreliable, a manager logged every crash and never recorded the weeks it ran without fault.",
+                  "url": ""
+                },
+                {
+                  "text": "A viewer convinced a film was bad read only the harsh reviews and treated the good ones as evidence the critics had been paid.",
+                  "url": ""
+                },
+                {
+                  "text": "Once he had made up his mind the policy would fail, every news story he read looked like further proof he had been right.",
+                  "url": ""
+                },
+                {
+                  "text": "A subscriber who decided the service had declined noticed every outage and forgot the months that passed without one.",
+                  "url": ""
+                },
+                {
+                  "text": "Having concluded a colleague was careless, she noted each small error and let the careful work pass without comment.",
+                  "url": ""
+                },
+                {
+                  "text": "A homeowner sure the neighbourhood was getting worse read every local crime report and ignored the falling figures printed beside them.",
+                  "url": ""
+                },
+                {
+                  "text": "Once a patient decided a medicine was not working, every ache confirmed it and every good day was put down to something else.",
+                  "url": ""
+                },
+                {
+                  "text": "A fan certain the team was badly run counted every defeat as evidence and every win as luck.",
+                  "url": ""
+                },
+                {
+                  "text": "Having decided the price was unfair, a customer searched for complaints online and stopped reading as soon as he found them.",
+                  "url": ""
+                },
+                {
+                  "text": "A reader who already distrusted a newspaper treated each article agreeing with them as accurate and each one that did not as biased.",
+                  "url": ""
+                },
+                {
+                  "text": "Once he judged the deal poor value, every comparison he ran was set up in a way that would show it.",
+                  "url": ""
+                },
+                {
+                  "text": "A shopper convinced an item was cheaper elsewhere kept checking sites until one confirmed it, then stopped looking.",
+                  "url": ""
                 }
               ],
               "negative": [
@@ -18318,6 +18394,46 @@
                 {
                   "text": "A scientist submits their data for peer review specifically inviting criticism that could disprove their theory. (Nickerson, 1998)",
                   "url": "https://journals.sagepub.com/doi/10.1037/1089-2680.2.2.175"
+                },
+                {
+                  "text": "Reading the good and bad reviews with the same care.",
+                  "url": ""
+                },
+                {
+                  "text": "Looking hardest for what would show the judgement wrong.",
+                  "url": ""
+                },
+                {
+                  "text": "Counting the evidence on both sides before deciding.",
+                  "url": ""
+                },
+                {
+                  "text": "He read the negative and the positive reviews in equal detail before deciding whether the price was fair.",
+                  "url": ""
+                },
+                {
+                  "text": "A shopper who suspected a brand was poor quality deliberately read the best reviews first to test the suspicion.",
+                  "url": ""
+                },
+                {
+                  "text": "Before concluding the service had declined, she checked the outage record for the months she remembered as trouble-free.",
+                  "url": ""
+                },
+                {
+                  "text": "A manager who thought the software was unreliable pulled the full uptime log rather than only the crash reports.",
+                  "url": ""
+                },
+                {
+                  "text": "A customer who expected the item to be cheaper elsewhere checked every major retailer and accepted the answer when it was not.",
+                  "url": ""
+                },
+                {
+                  "text": "A reader who distrusted a newspaper checked its claims against the record instead of judging each article by whether it agreed with them.",
+                  "url": ""
+                },
+                {
+                  "text": "A fan convinced the team was badly run compared its results with the rest of the league before saying so.",
+                  "url": ""
                 }
               ]
             },
