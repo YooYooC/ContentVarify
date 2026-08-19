@@ -39,7 +39,15 @@ SOURCES = [
     {"file": "need-to-act-fast.csv",         "quadrant": "Need to Act Fast",         "format": "wide",
      "cols": {"cat": 0, "name": 1, "def": 2, "packed_pos": 4, "packed_neg": 5,
               "pos": [6, 7, 8, 9, 10], "neg": [11, 12, 13]}},
-    {"file": "need-to-act-fast-parsed.csv",  "quadrant": "Need to Act Fast Parsed",  "format": "parsed",
+    # Same quadrant as the row above, in a different sheet layout. The two
+    # sheets overlap heavily but neither contains the other: the wide sheet
+    # carries most of the worked examples, the parsed sheet carries most of
+    # the counter-examples plus four biases the wide sheet never got
+    # (Defensive attribution hypothesis, Lake Wobegon effect, Hard-easy
+    # effect, False consensus effect). Emitting them as two quadrants shipped
+    # every shared bias twice under two names, which is why they are given
+    # the same quadrant name here and folded together by merge_quadrants().
+    {"file": "need-to-act-fast-parsed.csv",  "quadrant": "Need to Act Fast",  "format": "parsed",
      "cols": {"name": 0, "def": 1, "pos": 2, "neg": 3}},
 ]
 
@@ -315,6 +323,130 @@ def slug(s):
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
+def norm_text(s):
+    return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
+
+
+def merge_quadrants(quadrants):
+    """Fold quadrants, categories and biases that share a name into one.
+
+    Two sheets describe the "Need to Act Fast" quadrant. Without this they
+    became two quadrants holding 51 and 53 biases, 49 of them the same bias
+    under the same name in both — so every one of those biases was indexed
+    twice, its examples split across two entries that then competed with each
+    other for the top-1 slot. Retrieval keys on the bias NAME, so the split
+    also inflated per-bias support counts without adding information.
+
+    Merging is by name at every level, and examples are unioned with exact
+    duplicates (ignoring case and punctuation) collapsed, so a bias present in
+    both sheets ends up with the union of what each contributed exactly once.
+    """
+    out, by_name, merged = [], {}, 0
+
+    def merge_items(dst, src):
+        nonlocal merged
+        seen = {norm_text(i["text"]) for i in dst}
+        for it in src:
+            k = norm_text(it["text"])
+            if k in seen:
+                merged += 1
+                continue
+            seen.add(k)
+            dst.append(it)
+
+    for q in quadrants:
+        tgt = by_name.get(q["name"])
+        if tgt is None:
+            # Collapse repeats inside this quadrant too, then keep it.
+            by_name[q["name"]] = tgt = {"name": q["name"], "id": q["id"],
+                                        "categories": []}
+            out.append(tgt)
+        cat_by_name = {c["name"]: c for c in tgt["categories"]}
+        for c in q["categories"]:
+            dc = cat_by_name.get(c["name"])
+            if dc is None:
+                cat_by_name[c["name"]] = dc = {"name": c["name"], "biases": []}
+                tgt["categories"].append(dc)
+            bias_by_name = {b["name"].strip().lower(): b for b in dc["biases"]}
+            for b in c["biases"]:
+                db = bias_by_name.get(b["name"].strip().lower())
+                if db is None:
+                    bias_by_name[b["name"].strip().lower()] = db = {
+                        "name": b["name"], "definition": b["definition"],
+                        "positive": [], "negative": []}
+                    dc["biases"].append(db)
+                elif not db["definition"]:
+                    db["definition"] = b["definition"]
+                merge_items(db["positive"], b["positive"])
+                merge_items(db["negative"], b["negative"])
+    return out, merged
+
+
+def relocate_strays(quadrants):
+    """Move a bias to the category the rest of the sheets file it under.
+
+    The parsed sheet has no category column, so parse_parsed() files every
+    bias it sees before the first category header under a category named
+    after the quadrant. Those biases are not category-less in the other
+    sheets; leaving them in a synthetic bucket splits a bias across two
+    categories purely by which sheet reached it first.
+    """
+    moved = 0
+    for q in quadrants:
+        home = {}
+        for c in q["categories"]:
+            if c["name"] == q["name"]:
+                continue
+            for b in c["biases"]:
+                home[b["name"].strip().lower()] = c
+        for c in [c for c in q["categories"] if c["name"] == q["name"]]:
+            keep = []
+            for b in c["biases"]:
+                dest = home.get(b["name"].strip().lower())
+                if dest is None:
+                    keep.append(b)
+                    continue
+                # The destination category already holds this bias, so fold
+                # the examples in rather than creating a second entry.
+                twin = next((x for x in dest["biases"]
+                             if x["name"].strip().lower() == b["name"].strip().lower()), None)
+                if twin is None:
+                    dest["biases"].append(b)
+                else:
+                    for side in ("positive", "negative"):
+                        seen = {norm_text(i["text"]) for i in twin[side]}
+                        twin[side].extend(i for i in b[side]
+                                          if norm_text(i["text"]) not in seen
+                                          and not seen.add(norm_text(i["text"])))
+                moved += 1
+            c["biases"] = keep
+        q["categories"] = [c for c in q["categories"] if c["biases"]]
+    return moved
+
+
+def dedupe_within_bias(quadrants):
+    """Drop repeats of the same example inside one bias.
+
+    A duplicated example is not extra evidence — it is one example given two
+    votes in every nearest-neighbour ballot it appears in.
+    """
+    dropped = 0
+    for q in quadrants:
+        for c in q["categories"]:
+            for b in c["biases"]:
+                for side in ("positive", "negative"):
+                    seen, keep = set(), []
+                    for it in b[side]:
+                        k = norm_text(it["text"])
+                        if k in seen:
+                            dropped += 1
+                            continue
+                        seen.add(k)
+                        keep.append(it)
+                    b[side] = keep
+    return dropped
+
+
 def dedupe_contradictions(quadrants):
     """Remove any example that carries both labels within the same bias.
 
@@ -354,6 +486,9 @@ def main():
             "categories": cats,
         })
 
+    quadrants, merged = merge_quadrants(quadrants)
+    moved = relocate_strays(quadrants)
+    repeats = dedupe_within_bias(quadrants)
     fixed, unverified = dedupe_contradictions(quadrants)
 
     data = {"title": "Content Verify", "quadrants": quadrants}
@@ -375,8 +510,12 @@ def main():
         print(f"  {q['name']:<24}{len(q['categories']):>5}{nb:>8}{np_:>10}{nn:>10}")
     print(f"  {'TOTAL':<24}{'':>5}{tb:>8}{tp:>10}{tn:>10}   ({tp + tn} training examples)")
 
+    if merged or moved or repeats:
+        print(f"\n  merged {merged} example(s) present in more than one sheet, "
+              f"relocated {moved} bias(es) out of a sheet-shaped category, "
+              f"dropped {repeats} repeat(s) inside a single bias")
     if fixed:
-        print(f"\n  removed {fixed} example(s) that carried both labels "
+        print(f"  removed {fixed} example(s) that carried both labels "
               f"(duplicated cell in the source sheet)")
     for qn, bn, k in unverified:
         print(f"    ! {qn} / {bn}: {k} contradictory example(s), side unverified "

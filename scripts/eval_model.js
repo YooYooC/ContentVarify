@@ -17,7 +17,9 @@ const ROOT = path.dirname(__dirname);
 const sandbox = { window: {}, console, Math, Date, Object, Array, JSON };
 sandbox.self = sandbox.window;
 vm.createContext(sandbox);
-for (const f of ["data/biases.js", "model.js"]) {
+// encoder.js first: model.js reads CVEncoder.stripCitation off it, and
+// without it loaded the eval would train on citation text the browser drops.
+for (const f of ["data/biases.js", "encoder.js", "model.js"]) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), sandbox, { filename: f });
 }
 

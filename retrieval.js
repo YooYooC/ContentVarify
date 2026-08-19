@@ -24,9 +24,11 @@
              per-bias accuracy — the curation to-do list.
 
    Duplicate texts are grouped and hidden together during evaluation.
-   The corpus contains a duplicated quadrant; without this, examples
-   retrieve their own copies at similarity 1.0 and every score is a lie.
-   (Measured: 46.3% top-1 with the leak, 25.0% without it.)
+   Without it, an example retrieves its own copy at similarity 1.0 and
+   every score is a lie: top-1 reads 98.9% with the guard disabled
+   against 42.2% with it on. The duplicated "Need to Act Fast" quadrant
+   that made this urgent is now merged at build time, but the guard stays
+   — the sheets are edited by hand and a re-pasted row is a normal event.
 
    Exposes: window.CVRetrieval.build(docs, encoder) -> index
    ============================================================ */
@@ -36,10 +38,48 @@
   var K_NEIGHBOURS = 15;    // how many nearest examples inform an answer
   var NEG_WEIGHT   = 0.7;   // a counter-example's vote against its own bias
   var MIN_KNOWN    = 3;     // fewer recognised terms than this -> insufficient
-  var SIM_FLOOR    = 0.12;  // below this, not evidence of anything
+  /* SIM_FLOOR drops a neighbour from the ballot entirely. It was 0.12, which
+     silently discarded 28% of all queries as "nothing close enough" — not
+     because they were unmatchable, but because cosine against a 30-word
+     example is spread thin across its terms and rarely clears 0.12 even when
+     the right bias is sitting right there. Measured over the corpus:
+
+       floor  K    top1    no candidate at all
+        0.12  15   42.2%      28.0%
+        0.08  15   48.5%       4.4%
+        0.06  20   50.3%       0.4%   <- chosen
+        0.04  25   51.2%       0.0%
+
+     Lowering it does not make the system claim more than it has: decide()
+     still forces "unreliable" whenever the best similarity falls below
+     CAL_BINS[0] (0.15), and confidence still comes from the measured
+     calibration. All the floor was doing was starving the vote of evidence
+     before that judgement was ever made. */
+  var SIM_FLOOR    = 0.06;
   var CAL_BINS     = [0.15, 0.22, 0.30, 0.40, 0.55];
-  var OK_CONF      = 0.60;  // present as an answer
-  var WEAK_CONF    = 0.30;  // present as a candidate worth looking at
+  /* Where to speak and how firmly. Confidence is conf * share * support,
+     and `share` is the top bias's slice of the positive similarity in the
+     ballot — so it moves whenever SIM_FLOOR or K change how many biases get
+     onto the ballot at all. These two numbers therefore have to be re-read
+     off the coverage curve every time those change; the old 0.60/0.30 were
+     measured against the 0.12 floor and, left in place after it moved, cut
+     the share of queries answered from 36% to 13%.
+
+     Measured now (leave-one-out, held out, K=15, floor 0.06):
+
+       confidence >=   share of queries   top-1 correct there
+            0.12             59.9%              67.3%
+            0.15             47.7%              73.7%   <- WEAK_CONF
+            0.20             32.5%              82.1%
+            0.25             22.6%              87.3%
+            0.30             15.6%              89.7%   <- OK_CONF
+            0.40              6.3%              95.5%
+
+     The pair below answers 47.7% of queries against the previous 35.6%, and
+     is right 73.7% of the time there against the previous 71.1% — more
+     coverage and better accuracy, which is what the floor fix bought. */
+  var OK_CONF      = 0.30;  // present as an answer
+  var WEAK_CONF    = 0.15;  // present as a candidate worth looking at
   var MIN_SUPPORT  = 8;     // examples a bias needs before it can be asserted
   var MIN_MARGIN   = 0.12;  // top-1 vs top-2 separation
 
@@ -88,8 +128,18 @@
       };
     }
 
-    encoder.fit(docs.map(function (d) { return d.text; }));
-    var vecs = docs.map(function (d) { return sortSparse(encoder.encode(d.text)); });
+    /* What is indexed is the example minus its citation; what is reported
+       is the example as curated. Author names are the rarest tokens in the
+       corpus and line up exactly with whichever bias cites that paper, so
+       indexing them lets a bias be found by its bibliography — an accuracy
+       that vanishes the moment a real user pastes text. See the note in
+       encoder.js. */
+    var strip = (window.CVEncoder && window.CVEncoder.stripCitation) ||
+                function (t) { return t; };
+    var indexText = docs.map(function (d) { return strip(d.text); });
+
+    encoder.fit(indexText);
+    var vecs = indexText.map(function (t) { return sortSparse(encoder.encode(t)); });
 
     /* inverted index: feature -> [docIdx, weight, ...] */
     var post = Object.create(null);
@@ -107,7 +157,9 @@
     (function () {
       var seen = Object.create(null), next = 0;
       for (var j = 0; j < n; j++) {
-        var key = docs[j].text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        // Keyed on the indexed text, so two copies of one example that
+        // differ only in the citation attached still hide together.
+        var key = indexText[j].toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
         if (seen[key] === undefined) seen[key] = next++;
         dupGroup[j] = seen[key];
       }
@@ -308,7 +360,7 @@
 
     // honest accuracy/coverage trade-off, from held-out predictions
     var coverage = [];
-    [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8].forEach(function (th) {
+    [0.08, 0.10, 0.12, 0.15, 0.18, 0.20, 0.25, 0.30, 0.40, 0.50].forEach(function (th) {
       var g = curve.filter(function (x) { return x.conf >= th; });
       coverage.push({
         threshold: th,

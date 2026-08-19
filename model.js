@@ -55,22 +55,23 @@
      confident-looking probability. These thresholds catch that.
 
      Chosen by measuring the accuracy/coverage trade-off on out-of-fold
-     predictions over the 7,655-example corpus:
+     predictions over the 7,541-example corpus:
 
        rule                     coverage   accuracy on what is kept
-       none                       100%        85.5%
-       known>=4, conc<=0.70        97.2%      85.7%
-       known>=5, conc<=0.60        94.3%      85.8%   <- chosen
-       known>=6, conc<=0.55        90.9%      86.0%
+       none                       100%        84.0%
+       known>=4, conc<=0.70        96.9%      84.0%
+       known>=5, conc<=0.60        94.0%      84.2%   <- chosen
+       known>=6, conc<=0.55        90.5%      84.4%
 
      Tightening further keeps buying a little accuracy, but each step
      costs several times more coverage than it returns, so the knee is
      taken rather than the maximum.
 
-     What the chosen rule refuses is 5.7% of the corpus, and the model is
-     80.5% accurate there against 85.5% overall — five points worse, on
-     the slice where it has least to go on. On the curated corpus that
-     slice is only mildly overconfident (claiming 81.7%), because every
+     What the chosen rule refuses is 6.0% of the corpus, and the model is
+     80.4% accurate there against 84.0% overall — nearly four points
+     worse, on the slice where it has least to go on. On the curated
+     corpus that slice is not overconfident at all (claiming 79.4%,
+     scoring 80.4%), because every
      example in it is still a well-formed sentence. The gate earns its
      keep on what users actually paste: a fragment with two recognised
      words is normalised to unit length like everything else, and without
@@ -421,8 +422,14 @@
       };
     }
 
+    /* Learn from the example minus its citation. Author names are perfectly
+       correlated with whichever side of whichever bias cites that paper, and
+       no text a user submits carries them, so a weight learned on "kahneman"
+       is a weight that can never fire in production. See encoder.js. */
+    var strip = (window.CVEncoder && window.CVEncoder.stripCitation) ||
+                function (t) { return t; };
     var docTerms = new Array(n);
-    for (i = 0; i < n; i++) docTerms[i] = counts(terms(docs[i].text));
+    for (i = 0; i < n; i++) docTerms[i] = counts(terms(strip(docs[i].text)));
     var voc = buildVocab(docTerms);
 
     var X = new Array(n);

@@ -330,17 +330,27 @@ V. Increased encoding difficulty and shorter retention intervals reduce cryptomn
 * A person who is reminded that feminist organizations were responsible for the rights they now take for granted and subsequently updates their attitude toward those groups is demonstrating that cryptomnesia can be reversed when source information is consciously restored. (Butera et al., 2009) https://econtent.hogrefe.com/doi/10.1027/1864-9335.40.3.130
 
 * When a participant in a recognition test correctly identifies which words on a list they had personally generated versus which ones came from a partner, they are demonstrating intact source memory rather than cryptomnesia, even when the same people show cryptomnesia errors in the generation phase of the same experiment. (Marsh & Bower, 1993) https://pubmed.ncbi.nlm.nih.gov/8501434/"
-,Source confusion,Misremembering where information was originally learned.,"Attributing news to friend, actually read online.
- Believing teacher said fact, from textbook.
- Thinking rumor came from reliable source.
-seeing a  movie changing memories of your childhood.
- Attributing quote to wrong person.
+,Source confusion,Misremembering where information was originally learned.,"Right fact, wrong channel: sure it was the news, it was a friend.
+Certain a colleague said it when it was in the handbook.
+Remembering having read something that was only ever spoken.
+Attributing a quote to the wrong person entirely.
+The information is right; where it came from is not.
 
-I. Ronald Reagan (cited in Johnson et al. 1993): Retold a story from a 1940s Dan Andrews movie as if it were an official Army report
-II. George W. Bush: Recalled seeing live footage of the 9/11 attacks on TV, despite no live footage being broadcast at that time
-III. Johnson & Raye (1979): People confuse imagined scenarios with actual perceptions, especially when both have similar perceptual vividness
-IV. Johnson, Hashtroudi & Lindsay (1993): Participants misattributed newly presented words to having mentally generated them earlier
-V. Misleading suggestions cause people to believe they witnessed things they only read or heard about in a courtroom setting","Noting sources when learning information.
+A reader repeats a statistic insisting they read it in a national newspaper, when a colleague had mentioned it in a corridor.
+Ronald Reagan retold a scene from a 1940s war film as though it were an incident recorded in an official Army report.
+George W. Bush recalled watching live footage of the first plane striking the tower, although no such footage was broadcast at the time.
+Participants who had generated words themselves later reported having read them on the screen.
+A student cites a claim to the assigned textbook when the lecturer said it and the textbook never mentions it.
+Someone insists a rumour came from a reliable outlet, having actually read it in an anonymous forum post.
+A witness attributes a detail to their own observation at the scene when it had reached them through a newspaper report afterwards.
+An adult recounts a family holiday in detail drawn from a home video watched many times rather than from the day itself.
+A manager credits a policy to head office when it was proposed in their own team's meeting.
+A speaker attributes an aphorism to Churchill that he never said and that reached them from a poster.
+A journalist remembers being told a fact on the record when it was said to them off it.
+A juror recalls hearing a detail in testimony when it was said by counsel in an opening statement.
+A doctor is sure a symptom was reported by the patient when it had been written in a referral letter.
+A friend repeats advice as their grandmother's when the words came from a book they read at the time.
+An analyst credits a forecast to the official release when it came from an unnamed blog covering it.","Noting sources when learning information.
 Checking origins before sharing claims.
 Keeping citations for facts.
 Verifying information with original sources.
@@ -351,17 +361,27 @@ II. High confidence in initial encoding prevents source confusion in many cases
 III. Distinctive perceptual details help maintain source separation—confusions occur primarily with ambiguous or overlapping sources
 IV. Item memory and source memory are dissociated—people often retain accurate item information while confusing its source
 V. Explicit source labeling at encoding significantly reduces source confusion errors"
-,Misattribution of memory,Correct memory assigned to wrong source or cause.,"Remembering face, misidentifying where seen.
- Attributing idea to wrong colleague.
- Linking emotion to incorrect event.
- Recognizing person from wrong context.
- You recall feeling anxious and blame a test, when it was really lack of sleep.
+,Misattribution of memory,Correct memory assigned to wrong source or cause.,"Right feeling, wrong cause: blaming the meeting, not the missed sleep.
+Producing someone else's idea believing it your own.
+A face feels familiar, so it must be the culprit.
+Mistaking the arousal from one cause for attraction.
+Assigning a mood to the nearest available explanation.
 
-I. Schacter (1999): People vividly recall hearing facts in conversations when they were actually read in texts, mixing up sources of information
-II. Loftus eyewitness testimony: Witnesses confidently identify perpetrators based on memories distorted through suggestion or misinformation
-III. Johnson & colleagues: People confuse imagined events with real perceptions, especially when both have similar sensory detail
-IV. Source confusion in dreams: People misattribute details from dreams to actual experiences they witnessed
-V. Post-event misinformation effect: Participants believe they saw details they only read or heard about later in the event sequence","Confirming source before attributing memories.
+A songwriter composes a melody they are certain is original and later finds it is a track they heard years ago and forgot.
+Someone recalls feeling anxious all afternoon and blames the presentation, when the cause was a night of almost no sleep.
+A witness picks a man out of a line-up because his face feels familiar; he had been a bystander at the scene, not the offender.
+Men interviewed on a high suspension bridge misread the fear the height produced as attraction to the interviewer.
+A researcher proposes an idea in good faith without recognising it as a suggestion a colleague made months before.
+A diner blames the restaurant for feeling unwell when the cause was a medication taken that morning.
+A reader judges a claim true because it feels familiar, the familiarity coming from having twice seen it debunked.
+A manager attributes their irritation in a review to the employee's work rather than to the argument they had beforehand.
+Someone credits a sunny mood to good news when the change in the weather had more to do with it.
+A student is certain they worked the proof out themselves, having read it and forgotten the reading.
+A shopper feels warmly towards a brand they believe they have always liked, the warmth coming from repeated advertising they never registered.
+A patient blames a new drug for a headache that the caffeine they gave up was causing.
+A comedian delivers a line as their own, having absorbed it from a set they watched and forgot.
+A juror finds a defendant's name familiar and takes it for prior notoriety, when they had read it in the summons that week.
+A partner attributes their restlessness to the relationship rather than to the job they dread returning to.","Confirming source before attributing memories.
 Cross-checking recollections with timelines.
 Asking others to verify sources.
 Keeping records of information origins.
@@ -432,13 +452,69 @@ V. Evolutionary adaptation: In safe, resource-rich environments, positivity bias
 ,,,"I. Caplan & Waters (1999): Serial recall accuracy decreases as list length increases due to greater capacity demands on working memory. II. Baddeley (1986): List-length effects emerge because longer lists exceed the 7±2 capacity limitations of short-term memory. III. Cowan (2001): The capacity limitation is approximately 4 items regardless of item complexity; longer lists violate this threshold. IV. Miller (1956): Memory span for lists averages 7±2 items, establishing a fixed capacity ceiling independent of list length. V. Schweickert & Boruff (1986): List-length effects correlate with vocal duration; items taking longer to articulate produce greater length effects.",I. Oberauer (2002): List-length effects are minimal when using recognition rather than recall testing procedures. II. Balota et al. (1992): Retrieval practice reduces list-length effects through strengthening of memory traces. III. Chen & Cowan (2005): Attentional resources can partially overcome capacity limitations imposed by list length. IV. Rouder et al. (2008): Bayesian methods show some individuals maintain stable recall despite list length through different encoding strategies. V. Vergauwe et al. (2010): List-length effects can be eliminated through consolidation procedures that transfer items to long-term memory.
 ,Serial recall effect,Recalling items in exact presented order.,1. I struggled because the test required recalling items in exact order. 2. Remembering steps sequentially was harder than recall. 3. Order errors ruined my serial recall performance. 4. I knew the items but forgot their correct order. 5. The phone number had to be recalled in precise sequence.,1. Free recall: any order. 2. Cued recall: ignores sequence. 3. Recognition: identify items. 4. Category recall: ignores sequence. 5. Reconstruction: different task.
 ,,,"I. Henson et al. (1996): Serial recall requires maintenance of positional information along with item identity, increasing task difficulty. II. Lewandowsky & Farrell (2008): Recall of sequence depends on both memory for items and memory for their ordinal positions. III. Brown et al. (2000): The primacy and recency effects in serial recall reflect distinct mechanisms for first and last items. IV. Page & Norris (1998): Serial recall errors show position-specific patterns reflecting interference between similar-position items across trials. V. Nairne (2002): Temporal context provides retrieval cues for serial recall; items encoded with temporal markers are recalled more accurately.","I. Free recall eliminates sequence requirements, producing substantially higher recall rates than serial recall. II. Cued recall—providing category cues—shows that item memory exceeds sequence memory in most contexts. III. Recognition testing shows individuals can identify items they cannot recall in correct serial order. IV. Retroactive inhibition affects serial order encoding less than it affects free recall. V. Reconstruction tasks that don't require serial order show higher accuracy than serial recall of identical items."
-,Duration neglect,Duration has little effect on remembered evaluation.,1. I can evaluate duration focusing on moments instead. 2. Constant intensity matters; duration matters. 3. A billing error for hours duration matters less than the error itself. 4. My evaluation focused on the moment rather than how long it lasted. 5. Very short pain lasting long time felt less impactful.,1. Can estimate duration when asked. 2. Constant intensity: duration matters. 3. Billing hours: duration primary. 4. Narrative accounts: duration shapes memory. 5. Very long pain more impactful.
+,Duration neglect,Duration has little effect on remembered evaluation.,"A long ordeal and a short one are remembered as equally bad.
+How long it lasted does not enter the verdict.
+Doubling how long it ran changes nothing in the rating.
+Length leaves no trace in the memory of it.
+Rating by how bad it felt, not how long it went on.
+
+Patients whose procedure lasted four minutes and patients whose lasted over twenty rated it as similarly unpleasant, and the extra sixteen minutes left almost no trace.
+Participants who held a hand in painfully cold water for sixty seconds and those who held it for ninety rated the two trials as about equally painful.
+A commuter delayed forty minutes and a commuter delayed ten describe the disruption in the same terms, because how long it ran never entered it.
+Holidaymakers rated a three-week trip no more highly than a one-week trip to the same place, and the extra fortnight added nothing to the rating.
+A viewer rates a ninety-minute film and a three-hour film on how gripping each was, and the running time plays no part.
+Listeners rated a long unpleasant noise and a short one as equally aversive once both had stopped.
+A diner remembers the meal by how good the food was, and the two-hour wait leaves no mark on the rating.
+An employee recalls a project by how stressful it felt, never registering that it ran three months longer than the last one.
+Asked to rank past holidays, a traveller produces an order bearing no relation to how long any of them lasted.
+Someone describes a hospital stay as awful without the number of nights figuring in the account at all.
+A caller rates two spells on hold identically although one ran three times as long as the other.
+A reader rates a short story and a long novel on how absorbing each was, and the length plays no part.
+A worker recalls a shift as gruelling without registering that it was shorter than the one before it.
+A student recalls the exam as brutal, and how long the paper ran leaves no impression at all.
+Two drivers stuck in traffic for five minutes and for an hour describe the delay in the same words.","How long it ran is counted as part of the cost.
+A longer ordeal is judged worse than a shorter one.
+Asked how long it lasted, the answer is accurate.
+Total time is added up rather than felt.
+Twice as long is treated as twice as much.
+
+Asked explicitly how long the procedure had lasted, patients estimated the time accurately even where it had not shaped their overall rating.
+A client billed by the hour tracks how long the work ran as the primary quantity, because the payment depends on time rather than on intensity.
+When participants were prompted to attend to how long the experience was running, the length did shape their later evaluation of it.
+Reviewers rating a course weighed the total hours it demanded alongside how useful each session had been.
+A patient chooses the shorter of two equally uncomfortable treatments, on the ground that less total time under it is less of it.
+An editor judges whether a film's three-hour running time earned itself rather than ignoring the length.
+When memory was probed weeks later rather than immediately, how long the experience had lasted did appear in the evaluations.
+A manager comparing two outages counts the hours each one lasted rather than recalling how alarming each felt.
+A runner rates a marathon as harder than a ten-kilometre race, treating the distance covered as part of the difficulty.
+An auditor totals the days a fault went unfixed rather than going on how serious it seemed at the time.
+A commuter picks the route that takes twenty minutes over the one that takes fifty, counting the time as the cost it is."
 ,,,"I. Kahneman et al. (1993): Remembered utility depends primarily on peak and end intensity rather than total duration of an experience. II. Ariely & Carmon (2000): Duration of pain has minimal effect on retrospective pain evaluations compared to peak pain and ending pain. III. Schreiber & Kahneman (2000): Aggregate duration has negligible influence on remembered satisfaction; ending intensity dominates judgments. IV. Redelmeier & Kahneman (1996): Patients' retrospective pain judgments correlate strongly with peak pain and final pain, not total duration. V. Do et al. (2008): Duration neglect appears robust across multiple stimulus types—pain, pleasure, sound, video—in remembered evaluation.","I. Cavanaugh et al. (2015): When explicitly asked to estimate duration, participants show accurate duration judgments despite neglecting duration in immediate evaluation. II. Kemp et al. (2008): Repeated experiences or vivid memories restore duration effects in older adults with preserved cognitive function. III. De Vries et al. (2012): Actively thinking about duration during experience reduces duration neglect in subsequent evaluation. IV. Mitchell et al. (2011): Billing hours: duration primary factor when payment depends on time rather than intensity. V. Zauberman & Urminsky (2016): Duration effects emerge when memory is probed weeks later; initial evaluation neglects duration."
 ,Misinformation effect,Misleading info impairs original memory.,"1. After hearing misleading information, I misremembered seeing details. 2. False information blended into my original memory. 3. Leading comments distorted my recall of the accident. 4. Post-event rumors reshaped my memory of the event. 5. Over time, I forgot minor details and exaggerated the main conflict.",1. Detailed source monitoring reduces effect. 2. Central details resist misinformation. 3. Source tagged unreliable reduces effect. 4. Warnings mitigate effect. 5. Sleep-guided memory resists.
 ,,,I. Loftus et al. (1978): Exposure to post-event misinformation systematically distorts memory for the original event in predictable directions. II. Tversky & Kahneman (1974): Misleading questions bias subsequent memory reports toward suggested information. III. Loftus (2005): Misinformation effects are stronger when original memory traces are weak and misinformation is encountered soon after the event. IV. Mitchell et al. (2011): False memories created through misinformation persist despite repeated warnings about their unreliability. V. Frenda et al. (2016): Emotionally significant events show reduced misinformation effects compared to neutral events.,I. Johnson et al. (1993): Detailed source monitoring of original event details resists misinformation effects. II. Chambers et al. (2005): Central details involving action resist misinformation effects more than peripheral details. III. Skagerberg & Wright (2009): Instructing participants about misinformation likelihood before exposure reduces subsequent effect. IV. Ecker et al. (2010): Corrections and warnings substantially reduce misinformation effects when provided immediately. V. Payne et al. (1994): Sleep-dependent consolidation reduces susceptibility to misinformation presented after learning.
 ,Leveling and sharpening,"Memory loses details, exaggerates others.",1. The story became simpler with key points emphasized. 2. Retelling smoothed details and amplified emotional parts. 3. I lost nuance but sharpened emotional impact. 4. Immediate detailed report captures more than recall later. 5. I lost nuance but sharpened emotional impact.,1. Moment-by-moment rating correlates better. 2. Multiple independent capture contradicts effect. 3. Detailed documentation stabilizes memory. 4. Ambiguous omission or realistic consolidation. 5. Objective outcomes not feeling.
 ,,,I. Bartlett (1932): Reproductions of stories show systematic changes over retelling with details leveled and emotionally significant elements sharpened. II. Wynn & Logie (1998): Narrative memory shows progressive simplification of peripheral details while central emotional elements remain vivid. III. Davis & Loftus (2007): Retelling of autobiographical narratives produces systematic leveling of trivial details and sharpening of consequential events. IV. Bergman & Roediger (1999): Repeated retrievals of autobiographical memories show progressive integration and emotional elaboration. V. Anderson & Ronnberg (1997): Leveling effects are stronger for details rated as less central to the narrative theme.,I. Accuracy maximization: Contemporaneous written records show minimal leveling and sharpening compared to retrospective recall. II. Multiple independent witnesses: Detailed independent accounts reduce systematic sharpening of consistent elements. III. Recorded documentation: Video or audio records reveal that memory narratives oversimplify compared to actual events. IV. Cognitive interview techniques: Reconstructing context reduces sharpening of emotional but not objective details. V. Autobiographical expertise: Individuals trained in detailed reporting show less dramatic leveling and sharpening.
-,Peak-end rule,Judgment based on peak and end moments.,1. I judged the vacation by its best moment and ending. 2. The painful procedure felt tolerable because it ended gently. 3. I remembered the peak excitement and conclusion. 4. The experience's ending outweighed average quality. 5. I remembered the peak excitement and conclusion.,1. Moment-by-moment rating correlates better. 2. Multiple peaks debilitate rule application. 3. Ambiguous and hard to apply. 4. Objective outcomes not feeling. 5. Post-experience reflection; different rating.
+,Peak-end rule,Judgment based on peak and end moments.,"The best moment and the ending decide the verdict.
+A gentle ending redeems a bad experience.
+One high point outweighs a mediocre average.
+How it finished is what gets remembered.
+Judging the whole by its most intense moment.
+
+A holidaymaker rates the trip by one extraordinary afternoon and a warm farewell dinner, and the indifferent days between them barely enter the verdict.
+Concertgoers rate the evening by the encore and the single best song, and the flat middle of the set counts for almost nothing.
+A diner forgives a mediocre meal because the dessert was superb and the send-off at the door was warm.
+An employee's view of a five-year job is set by one standout promotion and the manner of their final week.
+A reader judges a novel by its most striking chapter and its closing page rather than the level it held throughout.
+A patient rates the hospital stay by the worst night and the discharge conversation, and the uneventful days contribute almost nothing.
+Fans rate the season by the best match and the final result rather than by the average standard of play.
+A parent remembers a fraught day out by the one good moment on the pier and the peaceful journey home.
+A student judges the course by its best lecture and its last one, and the rest of the term barely registers.
+A film that sags in the middle is remembered warmly because its closing scene lands.
+A negotiator judges the whole deal by the concession that stung most and how amicably it closed.
+Someone rates a relationship by its happiest period and the way it ended, not the long ordinary stretch between.
+A patient whose procedure was allowed to finish on a milder note remembered the whole as less unpleasant than one stopped at its worst point.
+A conference is remembered for one outstanding keynote and a strong closing panel, and little else survives.
+A commuter rates the journey by the worst moment of the crush and how smoothly the final change went.",1. Moment-by-moment rating correlates better. 2. Multiple peaks debilitate rule application. 3. Ambiguous and hard to apply. 4. Objective outcomes not feeling. 5. Post-experience reflection; different rating.
 ,,,"I. Kahneman et al. (2006): Remembered utility depends primarily on peak emotional intensity and end-state intensity rather than average utility throughout. II. Redelmeier & Kahneman (1996): Patients' remembered suffering correlates strongly with peak pain and final pain intensity, not total pain duration. III. Ariely & Carmon (2000): Adding a brief painful extension to the end of an experience paradoxically increases remembered positivity when pain level decreases. IV. Varey & Kahneman (1992): Peak-end rule predicts remembered satisfaction better than average or total utility in multiple domains. V. Fredrickson et al. (1993): The disproportionate influence of endings on retrospective evaluation appears automatic and implicit.","I. Tract recording: Contemporaneous moment-by-moment ratings of utility diverge substantially from peak-end predictions. II. Ariely & Zauberman (2003): When multiple equally intense peaks occur, the rule predicts poorly; averaging performs better. III. Experienced utility: Individuals making real-time choices frequently violate peak-end predictions and prioritize average utility. IV. Schreiber & Kahneman (2000): Objective outcome measures show weak correlation with peak-end model predictions. V. Mitchell et al. (2011): Delay between experience and judgment reduces peak-end effects; retrospective construction plays less role with delay."
 ,Tip of the tongue,Feeling you know a word but can't retrieve it.,"1. I knew the actor's name but couldn't retrieve it. 2. The word imminent, not immediate, hovered just beyond reach. 3. I experienced a strong feeling of knowing without actual recall. 4. The answer hovered just beyond reach. 5. Slips of tongue, not feeling.","1. Effortless recall: ""apple."" 2. Complete guessing, not feeling. 3. Rhyme cue retrieves word. 4. Sleep promotes retrieval. 5. Contextual priming eliminates state."
 ,,,"I. Brown & McNeill (1966): Tip-of-the-tongue states occur when semantic knowledge is intact but phonological retrieval is temporarily blocked. II. Schwartz et al. (2000): TOT states involve high-confidence knowledge combined with retrieval failure; accuracy of guesses exceeds chance. III. Metcalfe (1993): Partial retrieval of related words accompanies TOT states, suggesting partial activation of target word. IV. Harley & Brown (1998): TOT states are more common for rare words with longer phonological forms. V. James & Burke (2000): TOT frequency increases with normal aging despite stable semantic knowledge.","I. Completely novel or learned facts: No TOT feeling; either retrieved or truly inaccessible. II. Extended cueing: Providing complete cues (rhymes, first letters) shows true retrieval versus blocking. III. Sleep consolidation: Delayed recall eliminates TOT states for many words. IV. Implicit priming: Context priming removes TOT by facilitating retrieval pathways. V. Encoding strength: Strongly encoded material shows no TOT; weak encoding produces blocked access without TOT."

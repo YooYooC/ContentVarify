@@ -253,71 +253,27 @@ A participant in the original hospital problem experiment who answered correctly
 
 
 ",,
-,Neglect of probability,Ignoring actual likelihoods when judging risk.,Ignoring how likely something is,"Fearing flying more than driving.
- Buying warranties for low-risk items.
- Overreacting to rare dramatic news.
- Ignoring odds when choosing lottery numbers.
- Assuming a risky investment is safe because it feels right.
+,Neglect of probability,Ignoring actual likelihoods when judging risk.,Ignoring how likely something is,"Treating one-in-a-thousand and one-in-a-million as the same risk.
+Paying the same to cut a risk by a tenth as to remove it.
+Reacting to whether a risk exists, not how large it is.
+Buying warranties for low-risk items.
+Dismissing any chance above zero as a real danger.
 
-A person refuses to fly after hearing about a plane crash on the news, even though car travel is statistically far more dangerous per mile traveled. (Slovic, Fischhoff & Lichtenstein, 1982) https://www.ojp.gov/ncjrs/virtual-library/abstracts/facts-versus-fears-understanding-perceived-risk
-
-
-After winning a small prize in the lottery once, a teenager buys a ticket every week convinced that winning again is essentially guaranteed, ignoring that the odds remain astronomically small. (Kahneman & Tversky, 1979) https://www.jstor.org/stable/1914185
-
-
-Parents refuse to vaccinate their child because they heard of a child who had a severe reaction, treating the extremely rare adverse event as if it were a near-certainty. (Fischhoff & Beyth-Marom, 1983) https://psycnet.apa.org/doi/10.1037/0033-295X.90.4.239
-
-
-A gambler keeps placing bets on red at roulette because black has come up five times in a row, treating the next spin as though red is now essentially certain to appear. (Tversky & Kahneman, 1974) https://www.science.org/doi/10.1126/science.185.4157.1124
-
-
-A homeowner refuses to purchase earthquake insurance despite living in a high-risk zone because no quake has occurred in their lifetime, treating a low-frequency catastrophic risk as negligible. (Kunreuther et al., 1978) https://www.rand.org/pubs/reports/R1737.html
-
-
-A manager dismisses the need for cybersecurity protocols because the company has never been hacked before, ignoring actuarial data showing small businesses face significant breach risk. (Anderson et al., 2019) https://www.nist.gov/system/files/documents/2019/10/16/nistir8286-draft.pdf
-
-
-A student skips studying for a test because they have never failed before, treating the low but real probability of failure as zero. (Kahneman, 2011) https://psycnet.apa.org/record/2011-26535-000
-
-
-A politician votes against pandemic preparedness funding because no major outbreak has hit the country in decades, treating the low annual probability as equivalent to impossibility. (Sunstein, 2002) https://www.journals.uchicago.edu/doi/10.1086/340527
-
-
-Research participants in a classic study rated the probability of dying from a vivid rare cause (shark attack) as higher than dying from common causes like heart disease, reversing actual probabilities. (Lichtenstein et al., 1978) https://psycnet.apa.org/doi/10.1037/0033-2909.85.3.551
-
-
-A new driver assumes they will never be in an accident because they feel confident behind the wheel, ignoring that roughly 1 in 100 drivers will be involved in an injury crash each year. (Svenson, 1981) https://psycnet.apa.org/doi/10.1037/0033-2909.90.2.382
-
-
-A smoker dismisses warnings about lung cancer risk because they know an 80-year-old who has smoked all their life, treating the relative rarity of surviving heavy smoking as proof the risk is negligible. (Weinstein, 1989) https://www.sciencedirect.com/science/article/pii/0749597889900414
-
-
-Participants in a study were willing to pay the same amount to remove one contaminant from a lake whether the stated risk was 1-in-10,000 or 1-in-100,000, showing insensitivity to actual probability magnitudes. (Baron & Greene, 1996) https://link.springer.com/article/10.1007/BF00056163
-
-
-After a neighborhood burglary, residents who previously ignored alarms installed expensive security systems, overweighting the now-salient risk far beyond what crime statistics justified. (Viscusi & Zeckhauser, 2006) https://www.nber.org/papers/w11313
-
-
-A startup founder insists their product will definitely succeed because they personally know two founders who struck it rich, ignoring the base-rate failure rate of over 90% for new ventures. (Camerer & Lovallo, 1999) https://www.aeaweb.org/articles?id=10.1257/aer.89.1.306
-
-
-Investors poured money into lottery-like penny stocks that offered tiny chances of enormous gains while ignoring higher-probability moderate returns from index funds. (Kumar, 2009) https://doi.org/10.1111/j.1540-6261.2009.01483.x
-
-
-A patient who had a one-in-a-million adverse drug reaction refuses all future medications in that class, treating recurrence as virtually certain despite negligible base rates. (Chapman & Elstein, 2000) https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1761610/
-
-
-A town that experienced a rare hundred-year flood twice in a decade built no new flood barriers because officials believed another major flood in the near term was essentially impossible. (Kunreuther & Pauly, 2004) https://doi.org/10.1093/reep/rer002
-
-
-In a classic experiment, subjects paid nearly as much to reduce a small risk from 5% to 0% (eliminating it entirely) as to reduce a large risk from 50% to 5%, showing pseudocertainty preferences that ignore probability magnitudes. (Kahneman & Tversky, 1979) https://www.jstor.org/stable/1914185
-
-
-A jury awarded enormous punitive damages to a plaintiff who suffered a rare but dramatic injury even though expert testimony showed the defendant's product was safer than alternatives, because the vivid harm overshadowed probability reasoning. (Sunstein et al., 2002) https://psycnet.apa.org/record/2002-01458-000
-
-
-An investor pulled all funds out of the stock market after a single day's large drop, treating a low-probability catastrophic loss as imminent rather than weighing long-run statistical returns. (Benartzi & Thaler, 1995) https://www.jstor.org/stable/2138423
-","Comparing risks using actual statistics.
+Participants were willing to pay the same amount to clean a contaminant from a lake whether the stated risk was 1-in-10,000 or 1-in-100,000, showing the number itself barely entered the judgement.
+Subjects paid nearly as much to remove a small risk entirely, from 5% to 0%, as to cut a large one from 50% to 5%, valuing certainty rather than the size of the reduction.
+A parent who accepts a one-in-ten-thousand surgical complication rejects a different procedure with a one-in-a-million complication, having reacted to the word 'complication' rather than either figure.
+A shopper buys an extended warranty on a kettle and declines one on a car, having judged that both could break rather than how likely either is.
+Asked to price flight insurance, travellers paid as much to cover death by terrorism alone as to cover death from any cause, treating the narrower risk as though it were the same size.
+A regulator spends the same on a hazard expected to harm one person a century as on one expected to harm hundreds a year, because both are described as 'a risk to the public'.
+A shopper pays a large premium for food labelled free of a chemical without asking whether the residue in the ordinary version is a thousandth of the safe limit or a tenth of it.
+A commuter who would not cross a bridge with a one-in-a-million failure rate drives the same route daily at a far higher rate, having responded to the idea of collapse rather than to either probability.
+A committee treats a threat as urgent because it is 'possible', and never asks whether possible means once a decade or once an aeon.
+A donor gives the same amount to prevent a disease affecting one child in a million as to prevent one affecting one child in a hundred, moved by the description rather than the scale.
+A patient refuses a drug over a side effect listed as 'rare' without registering that rare here means one case in two hundred thousand.
+A manager rejects a supplier after learning a defect is 'not impossible', treating any non-zero chance as equivalent to a likely one.
+A council pays heavily to remove the last trace of a contaminant after cheaper work had already cut exposure by 99%, valuing zero far beyond the reduction it bought.
+Voters backed a policy promising to 'eliminate' a hazard over one promising to cut it by ninety per cent at a fraction of the cost.
+A traveller who worries equally about a one-in-a-hundred and a one-in-a-million chance of losing luggage packs identically for both airlines.","Comparing risks using actual statistics.
  Choosing insurance based on expected value.
  Evaluating investments using probability models.
 
