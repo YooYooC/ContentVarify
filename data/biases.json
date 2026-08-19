@@ -4664,6 +4664,70 @@
                 {
                   "text": "A country adopts a new education policy primarily because several neighboring countries have already implemented it, with policymakers citing widespread adoption as the main argument for change rather than independently evaluating whether the policy fits their own context. (Sunstein, 2003)",
                   "url": "https://doi.org/10.1017/S0140525X03000104"
+                },
+                {
+                  "text": "Everyone else was buying, so she bought too.",
+                  "url": ""
+                },
+                {
+                  "text": "Joined in because the people around her had.",
+                  "url": ""
+                },
+                {
+                  "text": "Bought without checking, because her friends had already.",
+                  "url": ""
+                },
+                {
+                  "text": "Since most of her friends had put money into the fund, she moved her savings across without looking into it herself.",
+                  "url": ""
+                },
+                {
+                  "text": "A first-time investor bought a cryptocurrency because everyone in his group chat already held some, and he never read what it did.",
+                  "url": ""
+                },
+                {
+                  "text": "A colleague signed up to the same pension option as the rest of her team rather than compare what each one paid out.",
+                  "url": ""
+                },
+                {
+                  "text": "A shopper bought the phone most of her friends carried without comparing it against anything else on the market.",
+                  "url": ""
+                },
+                {
+                  "text": "A student picked the module almost everyone in her year had chosen, without reading what it covered.",
+                  "url": ""
+                },
+                {
+                  "text": "A homeowner switched to the energy supplier three neighbours had moved to, without checking whether its rates suited his usage.",
+                  "url": ""
+                },
+                {
+                  "text": "A saver moved into a fund after hearing that most people at his office had, taking their number as reason enough.",
+                  "url": ""
+                },
+                {
+                  "text": "A diner ordered what the rest of the table had ordered rather than read the menu.",
+                  "url": ""
+                },
+                {
+                  "text": "A manager adopted the tool every other department already used, without asking whether it fitted his team's work.",
+                  "url": ""
+                },
+                {
+                  "text": "A parent chose the school most families on her street had chosen, and never visited the alternatives.",
+                  "url": ""
+                },
+                {
+                  "text": "A voter came round to a candidate after seeing that support had climbed past seventy per cent in the polls.",
+                  "url": ""
+                },
+                {
+                  "text": "A traveller booked the tour with the longest queue, on the reasoning that so many people could not be wrong.",
+                  "url": ""
+                },
+                {
+                  "text": "A trader piled into a position because the desk around him had, and only afterwards asked what the company did.",
+                  "url": ""
                 }
               ],
               "negative": [
@@ -4758,6 +4822,46 @@
                 {
                   "text": "A scientist reading a paper that has already accumulated thousands of citations evaluates its methodology and conclusions on their own merits rather than treating the high citation count as a reason to accept its findings without scrutiny. (Sunstein, 2003)",
                   "url": "https://doi.org/10.1017/S0140525X03000104"
+                },
+                {
+                  "text": "Checked it herself rather than follow the crowd.",
+                  "url": ""
+                },
+                {
+                  "text": "Popularity was noted, then set aside.",
+                  "url": ""
+                },
+                {
+                  "text": "Bought only after the numbers held up.",
+                  "url": ""
+                },
+                {
+                  "text": "Although most of her friends had bought the stock, she read the filings herself before deciding not to.",
+                  "url": ""
+                },
+                {
+                  "text": "An investor noticed a fund was popular with colleagues and then examined its fees and record before committing anything.",
+                  "url": ""
+                },
+                {
+                  "text": "A shopper whose friends all carried the same phone compared it against two others and chose a different one.",
+                  "url": ""
+                },
+                {
+                  "text": "A student picked the module that matched her plans rather than the one most of her year had taken.",
+                  "url": ""
+                },
+                {
+                  "text": "A homeowner checked the tariff against his own usage before following his neighbours to a new supplier.",
+                  "url": ""
+                },
+                {
+                  "text": "A diner read the menu and ordered something no one else at the table had chosen.",
+                  "url": ""
+                },
+                {
+                  "text": "A voter treated a candidate's rising poll numbers as a fact about the polls, not a reason to support them.",
+                  "url": ""
                 }
               ]
             },
