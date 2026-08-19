@@ -447,6 +447,36 @@ def dedupe_within_bias(quadrants):
     return dropped
 
 
+def cross_bias_duplicates(quadrants):
+    """Report examples filed under more than one bias.
+
+    An example that sits under two names votes for both every time it is
+    retrieved, so it teaches that the two biases are the same thing and
+    guarantees an error whichever way the ranking falls. Every case found so
+    far has been a stray paste in a sheet — a block of one bias's examples
+    landing in another's cell — which is invisible in the spreadsheet and
+    silent at build time until it is counted.
+
+    Not auto-resolved: which side a shared example belongs to is a judgement
+    about the biases, not something the parser can infer. Reported so the
+    sheets can be corrected at source.
+    """
+    where = {}
+    for q in quadrants:
+        for c in q["categories"]:
+            for b in c["biases"]:
+                for side in ("positive", "negative"):
+                    for it in b[side]:
+                        where.setdefault(norm_text(it["text"]), []).append(
+                            (b["name"], it["text"]))
+    out = {}
+    for hits in where.values():
+        names = sorted({n for n, _ in hits})
+        if len(names) > 1:
+            out.setdefault(" || ".join(names), []).append(hits[0][1])
+    return out
+
+
 def dedupe_contradictions(quadrants):
     """Remove any example that carries both labels within the same bias.
 
@@ -520,6 +550,17 @@ def main():
     for qn, bn, k in unverified:
         print(f"    ! {qn} / {bn}: {k} contradictory example(s), side unverified "
               f"-> dropped from both. Check the sheet.")
+
+    shared = cross_bias_duplicates(quadrants)
+    if shared:
+        n = sum(len(v) for v in shared.values())
+        print(f"\n  {n} example(s) filed under more than one bias, in "
+              f"{len(shared)} pair(s) — each one teaches that those biases are "
+              f"the same thing:")
+        for names, texts in sorted(shared.items(), key=lambda kv: -len(kv[1])):
+            print(f"    [{len(texts)}] {names}")
+            for t in texts[:2]:
+                print(f"          {t[:88]}")
 
     # A bias with nothing on one side teaches the model nothing about that
     # side, and is nearly always a column that moved rather than a gap in the
